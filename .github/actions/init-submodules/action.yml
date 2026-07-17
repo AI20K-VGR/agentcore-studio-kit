@@ -1,0 +1,27 @@
+# Composite action nội bộ — gom 1 chỗ việc init submodule PRIVATE bằng PAT read-only.
+# Dùng git url.insteadOf để route mọi github.com (kể cả URL SSH trong .gitmodules) qua token
+# trên HTTPS → KHÔNG phải đổi .gitmodules, dev local vẫn xài SSH. Token chỉ nằm trong git
+# config header (không echo), unset ngay sau init; GitHub mask secret khỏi log.
+name: Init private submodules
+description: Init private submodules via a read-only PAT (insteadOf, no .gitmodules change)
+inputs:
+  pat:
+    description: Fine-grained PAT (Contents read-only) có quyền đọc các repo studio
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        GH_PAT: ${{ inputs.pat }}
+      run: |
+        if [ -z "${GH_PAT}" ]; then
+          echo "::error::Thiếu PAT — truyền secrets.STUDIO_CI_READ_PAT vào input 'pat'."
+          exit 1
+        fi
+        BASE="https://x-access-token:${GH_PAT}@github.com/"
+        git config --global url."${BASE}".insteadOf "https://github.com/"
+        git config --global --add url."${BASE}".insteadOf "git@github.com:"
+        git config --global --add url."${BASE}".insteadOf "ssh://git@github.com/"
+        git submodule update --init --recursive
+        git config --global --remove-section url."${BASE}" || true

@@ -1,0 +1,112 @@
+# Reusable workflow (workflow_call) — LOGIC RECONSTRUCT DUY NHẤT cho MỌI repo con.
+#
+# Đây là "kế thừa" của GitHub Actions: mỗi repo con chỉ có 1 stub ~10 dòng gọi vào đây
+# (uses: hieubui2409/agentcore-studio-kit/.github/workflows/reusable-domain-ci.yml@main),
+# truyền domain_path/domain_package. Sửa quy trình CI 1 chỗ → cả 6 repo con ăn theo.
+#
+# Khi được gọi qua workflow_call, `github` context là của CALLER (repo con): actions/checkout
+# lấy code PR của repo con, và github.event...fork phản ánh PR của repo con. Reconstruct thì
+# clone repo cha private theo tên đầy đủ.
+#
+# KHÔNG LỘ TOKEN: repo con truyền secret qua `secrets: inherit`; PAT chỉ trong git config
+# header (không echo), unset sau clone; fine-grained read-only; fork-PR không được cấp secret.
+name: reusable-domain-ci
+
+on:
+  workflow_call:
+    inputs:
+      domain_path:
+        description: Đường dẫn của domain trong workspace, vd packages/kb hoặc apps/studio
+        required: true
+        type: string
+      domain_package:
+        description: Tên uv package, vd agentcore-studio-kb
+        required: true
+        type: string
+    secrets:
+      STUDIO_CI_READ_PAT:
+        description: Fine-grained PAT read-only để clone repo cha private + submodule
+        required: true
+
+env:
+  UV_VERSION: "0.11.19"
+  PARENT_REPO: hieubui2409/agentcore-studio-kit
+
+jobs:
+  # Đầy đủ: chỉ chạy khi có secret (push/PR nội bộ, không phải fork).
+  test-reconstructed:
+    if: github.event.pull_request.head.repo.fork == false
+    runs-on: ubuntu-latest
+    env:
+      STUDIO_DATABASE_URL: postgresql://studio_app:changeme@localhost:5433/studio_test
+      STUDIO_DATABASE_URL_ADMIN: postgresql://studio_owner:changeme@localhost:5433/studio_test
+    steps:
+      - name: Checkout domain (PR head)
+        uses: actions/checkout@v4
+        with:
+          path: _pr
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+
+      - name: Reconstruct workspace (private parent + submodules)
+        env:
+          GH_PAT: ${{ secrets.STUDIO_CI_READ_PAT }}
+        run: |
+          if [ -z "${GH_PAT}" ]; then
+            echo "::error::Thiếu secret STUDIO_CI_READ_PAT (repo con cần set + secrets: inherit)."
+            exit 1
+          fi
+          BASE="https://x-access-token:${GH_PAT}@github.com/"
+          git config --global url."${BASE}".insteadOf "https://github.com/"
+          git config --global --add url."${BASE}".insteadOf "git@github.com:"
+          git config --global --add url."${BASE}".insteadOf "ssh://git@github.com/"
+          git clone --recursive "https://github.com/${PARENT_REPO}.git" workspace
+          git config --global --remove-section url."${BASE}" || true
+
+      - name: Overlay PR code into workspace
+        run: |
+          rm -rf "workspace/${{ inputs.domain_path }}"
+          mkdir -p "workspace/${{ inputs.domain_path }}"
+          cp -a _pr/. "workspace/${{ inputs.domain_path }}/"
+          rm -rf "workspace/${{ inputs.domain_path }}/.git"
+
+      - name: uv sync (frozen)
+        working-directory: workspace
+        run: uv sync --frozen
+
+      - name: Start pgvector test DB
+        working-directory: workspace
+        run: |
+          docker run -d --name studio-ci-pg \
+            -p 5433:5432 \
+            -e POSTGRES_DB=studio_test -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres \
+            -v "$PWD/docker/postgres-init:/docker-entrypoint-initdb.d:ro" \
+            pgvector/pgvector:pg17
+          for i in $(seq 1 30); do
+            docker exec studio-ci-pg pg_isready -U postgres -d studio_test && break
+            sleep 2
+          done
+
+      - name: Run domain tests
+        working-directory: workspace
+        run: uv run --package "${{ inputs.domain_package }}" pytest "${{ inputs.domain_path }}/tests" -q
+
+      - name: Stop pgvector test DB
+        if: always()
+        run: docker rm -f studio-ci-pg
+
+  # Fallback fork-PR (không secret): chỉ lint-nông trên code repo con.
+  lint-shallow:
+    if: github.event.pull_request.head.repo.fork == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+      - run: uvx ruff check src tests
+      - run: uvx ruff format --check src tests

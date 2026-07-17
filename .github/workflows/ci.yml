@@ -1,4 +1,9 @@
 # GitHub Actions is the SSOT CI (Decision #8) — .gitlab-ci.yml is a minimal mirror only.
+#
+# Các domain là submodule PRIVATE: checkout mặc định chỉ lấy gitlink rỗng → uv workspace không
+# resolve được. Mỗi job vì thế gọi composite action ./.github/actions/init-submodules (init
+# submodule bằng PAT read-only STUDIO_CI_READ_PAT, dùng insteadOf nên KHÔNG đổi .gitmodules SSH).
+# Logic init nằm 1 chỗ ở composite action, không lặp trong từng job.
 name: ci
 
 on:
@@ -14,6 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/init-submodules
+        with:
+          pat: ${{ secrets.STUDIO_CI_READ_PAT }}
       - name: Install uv
         uses: astral-sh/setup-uv@v3
         with:
@@ -48,6 +56,9 @@ jobs:
       STUDIO_DATABASE_URL_ADMIN: postgresql://studio_owner:changeme@localhost:5433/studio_test
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/init-submodules
+        with:
+          pat: ${{ secrets.STUDIO_CI_READ_PAT }}
       - name: Install uv
         uses: astral-sh/setup-uv@v3
         with:
@@ -93,6 +104,9 @@ jobs:
       STUDIO_DATABASE_URL_ADMIN: postgresql://studio_owner:changeme@localhost:5433/studio_test
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/init-submodules
+        with:
+          pat: ${{ secrets.STUDIO_CI_READ_PAT }}
       - name: Install uv
         uses: astral-sh/setup-uv@v3
         with:
@@ -121,4 +135,7 @@ jobs:
     needs: [lint]
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/init-submodules
+        with:
+          pat: ${{ secrets.STUDIO_CI_READ_PAT }}
       - run: docker build -t studio-kit:ci .
