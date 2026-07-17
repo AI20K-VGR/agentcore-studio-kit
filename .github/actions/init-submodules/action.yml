@@ -23,5 +23,7 @@ runs:
         git config --global url."${BASE}".insteadOf "https://github.com/"
         git config --global --add url."${BASE}".insteadOf "git@github.com:"
         git config --global --add url."${BASE}".insteadOf "ssh://git@github.com/"
-        git submodule update --init --recursive
+        # apps/web KHÔNG thuộc uv workspace (app JS riêng) → parent CI không cần, và PAT read-only
+        # không cần quyền đọc repo web. Bỏ qua web khi init (update=none).
+        git -c submodule."apps/web".update=none submodule update --init --recursive
         git config --global --remove-section url."${BASE}" || true

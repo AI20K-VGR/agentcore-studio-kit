@@ -63,7 +63,10 @@ jobs:
           git config --global url."${BASE}".insteadOf "https://github.com/"
           git config --global --add url."${BASE}".insteadOf "git@github.com:"
           git config --global --add url."${BASE}".insteadOf "ssh://git@github.com/"
-          git clone --recursive "https://github.com/${PARENT_REPO}.git" workspace
+          # Clone parent rồi init submodule TRỪ apps/web (web là app JS riêng, không thuộc uv
+          # workspace → không cần dựng, PAT cũng không cần quyền đọc repo web).
+          git clone "https://github.com/${PARENT_REPO}.git" workspace
+          git -C workspace -c submodule."apps/web".update=none submodule update --init --recursive
           git config --global --remove-section url."${BASE}" || true
 
       - name: Overlay PR code into workspace
