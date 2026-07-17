@@ -16,7 +16,7 @@ lỗi submodule đến từ đó.
 | Path trong workspace | Repo GitHub (private) | Owner (write) | Nội dung |
 |---|---|---|---|
 | **(gốc)** `agentcore-studio-kit` | `hieubui2409/agentcore-studio-kit` | **mentor** | Repo CHA = workspace root: `pyproject.toml` + `uv.lock` + `docker/` + `docker-compose*.yml` + `.github/` (CI + **reusable-workflow** + **composite action**) + `Makefile` + `conftest.py` + `tests/` + `scripts/` + `docs/` + `GITFLOWS.md` + `README.md`. Ghim con trỏ 7 submodule. |
-| `packages/contracts` | `agentcore-studio-contracts` | **mentor** (2-approval) | `studio_contracts` — hợp đồng chung (Recipe/TraceEvent/Scorecard/NodeType/Protocol). Ai cũng phụ thuộc → đổi = 2 người duyệt. |
+| `packages/contracts` | `agentcore-studio-contracts` | **mentor** (đổi cần mentor duyệt) | `studio_contracts` — hợp đồng chung (Recipe/TraceEvent/Scorecard/NodeType/Protocol). Ai cũng phụ thuộc → đổi = mentor duyệt. |
 | `apps/studio` | `agentcore-studio-app` | **mentor** | `studio_app` — composition root: DB pool-split, RLS fence wiring, middleware, providers, obs, queue. |
 | `packages/kb` | `agentcore-studio-kb` | **DE** | `studio_kb` — KB pipeline + `kb.search` fence-DATA + `kb.chunks` RLS. |
 | `packages/engine` | `agentcore-studio-engine` | **AIE-1** | `studio_engine` — interpreter + 6 node executors. |
@@ -27,7 +27,7 @@ lỗi submodule đến từ đó.
 ```
 agentcore-studio-kit  (repo CHA — mentor)
 ├── pyproject.toml · uv.lock · docker/ · .github/ · Makefile · conftest.py · tests/   ← ở repo cha
-├── packages/contracts  ─▶ submodule agentcore-studio-contracts   (mentor, 2-approval)
+├── packages/contracts  ─▶ submodule agentcore-studio-contracts   (mentor, đổi cần duyệt)
 ├── apps/studio         ─▶ submodule agentcore-studio-app         (mentor)
 ├── packages/kb         ─▶ submodule agentcore-studio-kb          (DE)
 ├── packages/engine     ─▶ submodule agentcore-studio-engine      (AIE-1)
@@ -52,8 +52,8 @@ ranh giới CỨNG — không có token = không push được, không phải ch
 | **mentor** | **tất cả** (admin) | — |
 | _web (nếu SWE làm)_ | `agentcore-studio-web` | mentor giữ mặc định; cấp SWE `push` khi tới sprint canvas |
 
-**Contracts (2-approval):** không cấp write cho kỹ sư OJT. Đổi contract → mở PR ở
-`agentcore-studio-contracts`, cần **2 mentor** approve (đây là seam chung, đổi bừa là vỡ cả 4 người).
+**Contracts (mentor-approval):** không cấp write cho kỹ sư OJT. Đổi contract → mở PR ở
+`agentcore-studio-contracts`, cần **mentor** approve (đây là seam chung, đổi bừa là vỡ cả 4 người).
 
 ### Secret cho CI (mentor set 1 lần, xem §9)
 
@@ -173,7 +173,7 @@ git push                                      # push repo cha
 `contracts` là seam chung. Đổi nó = có thể vỡ cả 4 domain. Quy trình:
 
 1. Mở PR ở `agentcore-studio-contracts` mô tả rõ thay đổi (thêm field OPTIONAL = không bump; rename/
-   remove/required-add = breaking → bump `SCHEMA_VERSION`). Cần **2 approval**.
+   remove/required-add = breaking → bump `SCHEMA_VERSION`). Cần **mentor approval**.
 2. Merge contracts. Note lại `sha` mới.
 3. Mentor bump con trỏ contracts ở repo cha (`git submodule update --remote packages/contracts` →
    commit → push).

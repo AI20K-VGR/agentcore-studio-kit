@@ -44,7 +44,7 @@ graph TB
         EVAL["studio_evalhub<br/>owner: AIE-2"]
     end
     subgraph L0["Layer đáy — DIP seam"]
-        CONTRACTS["studio_contracts<br/>owner: mentor/shared (2-approval)"]
+        CONTRACTS["studio_contracts<br/>owner: mentor/shared (cần mentor duyệt)"]
     end
 
     APP --> KB
@@ -93,7 +93,7 @@ song song không đụng file nhau (xem §8).
 
 | Package | Import | Distribution (`[project].name`) | Owner | Schema | File cốt lõi (đã verify) |
 |---|---|---|---|---|---|
-| `packages/contracts` | `studio_contracts` | `agentcore-studio-contracts` | mentor/shared (2-approval) | — | `nodes.py` (`NodeType` 6-đóng), `recipe.py` (`Recipe`/`Node`/`Edge`), `trace.py` (`TraceEvent`), `kb.py` (`KbSearchResultItem`+`KbSearch` Protocol), `scorecard.py` (`Scorecard`/`CaseResult`), `protocols.py` (`EmbeddingService`/`LLM`/`TraceWriter`) |
+| `packages/contracts` | `studio_contracts` | `agentcore-studio-contracts` | mentor/shared (cần mentor duyệt) | — | `nodes.py` (`NodeType` 6-đóng), `recipe.py` (`Recipe`/`Node`/`Edge`), `trace.py` (`TraceEvent`), `kb.py` (`KbSearchResultItem`+`KbSearch` Protocol), `scorecard.py` (`Scorecard`/`CaseResult`), `protocols.py` (`EmbeddingService`/`LLM`/`TraceWriter`) |
 | `packages/kb` | `studio_kb` | `agentcore-studio-kb` | DE | `kb.*` | `schema.py` (DDL + RLS fence), `search.py` (`KbSearchService`, spec), `pipeline.py` (`KbPipeline` 5-method, spec) |
 | `packages/engine` | `studio_engine` | `agentcore-studio-engine` | AIE-1 | — (stateless) | `registry.py` (`NodeType`→executor map), `executors.py` (6 executor, spec), `interpreter.py` (`run()`, spec) |
 | `packages/workbench` | `studio_workbench` | `agentcore-studio-workbench` | SWE | `wb.*` | `schema.py` (DDL), `validator.py` (`graph_lint`, spec), `publish.py` (`publish`/`rollback`, spec), `tenant_wall.py` (`resolve_tenant`, spec) |
@@ -292,7 +292,7 @@ Danh sách đầy đủ seam ĐỂ TRỐNG khác (không phải Protocol từ co
 |---|---|---|
 | 1. Packaging | Mỗi quadrant là 1 uv workspace member, `[project].name` riêng, dependency riêng | `packages/*/pyproject.toml` (5 file) + `pyproject.toml` root `[tool.uv.workspace]` |
 | 2. CI-per-package | Matrix job `test` chạy `uv run --package <name> pytest <path>` từng package riêng | `.github/workflows/ci.yml` job `test.strategy.matrix` |
-| 3. Per-repo permission (multi-repo) | Mỗi domain là 1 submodule-repo riêng; owner có **write**, người khác chỉ **read** → ranh giới CỨNG ở tầng git (không phải soft review như CODEOWNERS cũ). Contracts = 2-approval. | `.gitmodules` (6 submodule) + collaborator-permission mỗi repo; chi tiết `GITFLOWS.md` §2 |
+| 3. Per-repo permission (multi-repo) | Mỗi domain là 1 submodule-repo riêng; owner có **write**, người khác chỉ **read** → ranh giới CỨNG ở tầng git (không phải soft review như CODEOWNERS cũ). Contracts = mentor-approval. | `.gitmodules` (6 submodule) + collaborator-permission mỗi repo; chi tiết `GITFLOWS.md` §2 |
 | 4. Schema-per-quadrant | Mỗi quadrant `ddl()` riêng, không copy-paste DDL tập trung; `ensure_all_schemas()` direct-import (P5–P8 chỉ điền thân `ddl()` trong package mình, không đụng `apps/studio`) | `core/schema.py::_QUADRANT_SCHEMA_MODULES` |
 
 "Seam antichain" giữ 4 owner làm song song không đụng file: class/`ddl()` stub đã tồn tại từ P1, mỗi

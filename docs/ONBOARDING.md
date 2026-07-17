@@ -15,7 +15,7 @@ AgentCore Studio batch. Read this before touching any package. The plan's full d
 - **4 owners**, one per quadrant, each self-sufficient inside their own package (see the ownership
   table below). You should never need to read, let alone edit, another owner's package to make
   progress on yours — if you find yourself needing to, that is a sign the 4 contracts
-  (`packages/contracts/`) are missing something, and that's a mini-RFC + 2-approval conversation,
+  (`packages/contracts/`) are missing something, and that's a mini-RFC + mentor-approval conversation,
   not a quiet cross-owner edit.
 - **8-step demo** — the graduation demo (charter.md §2) that proves the whole lifecycle works
   end to end, mirrored as one RED-by-design system-level test file:
@@ -30,7 +30,7 @@ AgentCore Studio batch. Read this before touching any package. The plan's full d
 | **AIE-1** | `packages/engine` | `studio_engine` | Interpreter, the 6 node executors (`kb-retrieve·llm-step·condition·tool-call·hitl-pause·end`), `EmbeddingService` 2-impl (stub-local + gateway — this is YOUR graded deliverable, do not accept a "complete" Gemini embedding shortcut), fence-EXECUTOR (pass `section_roles` through correctly, never bypass via the LLM) | Workbench/Tenant-Wall (SWE), doc-factory/`kb.search` internals/trace-sink (DE — you call `kb.search`, you don't write it), eval harness/judge/scorecard (AIE-2 — you supply citations, not verdicts) |
 | **AIE-2** | `packages/evalhub` | `studio_evalhub` | Eval harness, LLM-judge + agreement-check (vs the golden-set hand labels — don't trust the judge blindly), scorecard render, trace UX | eval-gate-wiring/publish/rollback (SWE — you supply the verdict, SWE wires the gate), golden-set authoring (DE), interpreter/executor/EmbeddingService (AIE-1 — you consume citations) |
 
-`packages/contracts` (`studio_contracts`) is mentor/shared-owned, 2-approval to change — every
+`packages/contracts` (`studio_contracts`) is mentor/shared-owned, mentor-approval to change — every
 quadrant package imports it (DIP), never each other. `apps/studio` (composition root) and
 `apps/web` (Vite + React Flow canvas scaffold) are mentor-owned.
 

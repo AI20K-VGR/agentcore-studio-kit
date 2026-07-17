@@ -30,7 +30,7 @@ make lint       # ruff check . && mypy strict (packages + apps) && lint-imports 
 
 ```
 packages/
-  contracts/   studio_contracts   — frozen pydantic contracts (owner: mentor/shared, 2-approval)
+  contracts/   studio_contracts   — frozen pydantic contracts (owner: mentor/shared, mentor-approval)
   kb/          studio_kb          — KB pipeline + kb.search fence-DATA (owner: DE)
   engine/      studio_engine      — interpreter + 6 node executors (owner: AIE-1, stateless)
   workbench/   studio_workbench   — form+canvas UI wiring, Tenant-Wall (owner: SWE)
@@ -136,7 +136,7 @@ The kit is designed around one onboarding rule: **2-4-8** — **2 weeks** to sta
 **8-step** demo proves the whole lifecycle end to end. Each OJT engineer lives in **one package**
 — DE never edits `packages/workbench`, SWE never edits `packages/kb`, and so on (see the ownership
 table below). Editing a package you don't own is a contract change, not a quadrant change, and
-needs the 2-approval rule (see `packages/contracts/`).
+needs the mentor-approval rule (see `packages/contracts/`).
 
 - **2** — **weeks to stand up**: this whole kit is designed to be mentor-built in ~2 weeks
   (Tuần 0, before Day 1 batch starts) so trainees `git clone` into a running skeleton on day one.

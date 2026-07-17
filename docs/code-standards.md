@@ -173,7 +173,7 @@ verify: `packages/engine/tests/test_interpreter_contract.py`,
 - **Ranh giới quyền = per-repo (submodule)**, KHÔNG dùng CODEOWNERS nữa (đã gỡ — trên GitHub-private-
   Free, CODEOWNERS + branch-protection không thành hard-gate được). Mỗi domain là submodule-repo riêng:
   `packages/kb`→DE, `packages/engine`→AIE-1, `packages/workbench`→SWE, `packages/evalhub`→AIE-2,
-  `packages/contracts`→mentor (2-approval), `apps/studio`→mentor. Owner có **write**, người khác **read**
+  `packages/contracts`→mentor (đổi cần duyệt), `apps/studio`→mentor. Owner có **write**, người khác **read**
   → chặn CỨNG ở tầng git. Phân quyền + thao tác chi tiết: **`GITFLOWS.md`**.
 - **6 `NodeType` đóng** (`packages/contracts/src/studio_contracts/nodes.py`, `StrEnum`):
   `kb-retrieve`, `llm-step`, `condition`, `tool-call`, `hitl-pause`, `end`. Đây là **nguồn duy nhất**
