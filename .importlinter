@@ -1,0 +1,21 @@
+; Layers-contract enforcing the 4-quadrant ownership boundary (plan.md "Import-namespace &
+; distribution" table + Decision — R-SPEC A4). studio_app (composition root) may import any
+; quadrant; the 4 quadrant siblings are independent (CANNOT import each other, CANNOT import
+; studio_app); every package may depend on studio_contracts (bottom layer, DIP).
+
+[importlinter]
+root_packages =
+    studio_contracts
+    studio_kb
+    studio_engine
+    studio_workbench
+    studio_evalhub
+    studio_app
+
+[importlinter:contract:layers]
+name = AgentCore Studio quadrant layering
+type = layers
+layers =
+    studio_app
+    studio_kb | studio_engine | studio_workbench | studio_evalhub
+    studio_contracts

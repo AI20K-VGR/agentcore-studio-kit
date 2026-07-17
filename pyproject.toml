@@ -1,0 +1,73 @@
+[project]
+name = "agentcore-studio-kit"
+version = "0.1.0"
+description = "AgentCore Studio — uv workspace umbrella (root carries no code of its own; installs all quadrant members)"
+requires-python = ">=3.14"
+dependencies = [
+    "agentcore-studio-contracts",
+    "agentcore-studio-kb",
+    "agentcore-studio-engine",
+    "agentcore-studio-workbench",
+    "agentcore-studio-evalhub",
+    "agentcore-studio-app",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.9",
+    "mypy>=1.14",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "import-linter>=2.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# Root umbrella has no `src/` package of its own — every distributable lives in a
+# workspace member (packages/* + apps/studio). `bypass-selection=true` is PROBE
+# OBSERVED (uv 0.11.19): without it, hatchling refuses to build a wheel for a
+# project with no discoverable package (Decision #1 caveat).
+[tool.hatch.build.targets.wheel]
+bypass-selection = true
+
+[tool.uv.workspace]
+members = ["packages/*", "apps/*"]
+# apps/web is a Vite/TS frontend (P10), NOT a Python member — never let the glob
+# above try to treat it as a workspace package.
+exclude = ["apps/web"]
+
+[tool.uv.sources]
+agentcore-studio-contracts = { workspace = true }
+agentcore-studio-kb = { workspace = true }
+agentcore-studio-engine = { workspace = true }
+agentcore-studio-workbench = { workspace = true }
+agentcore-studio-evalhub = { workspace = true }
+agentcore-studio-app = { workspace = true }
+
+# ruff/mypy/pytest config copied from document-intake production pyproject.toml
+# (R-DI §1, COPY-READY #1-3), src/testpaths adjusted for the workspace layout.
+[tool.ruff]
+line-length = 120
+src = ["packages", "apps"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+strict = true
+python_version = "3.14"
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = [
+    "tests",
+    "packages/contracts/tests",
+    "packages/kb/tests",
+    "packages/engine/tests",
+    "packages/workbench/tests",
+    "packages/evalhub/tests",
+    "apps/studio/tests",
+]

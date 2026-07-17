@@ -1,0 +1,23 @@
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.2
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  # F13 — belt-and-suspenders alongside .subtree-allowlist: blocks mentor/rubric/answer-key
+  # files from ever being committed into this kit tree (which gets squash-exported to the OJT
+  # team's own GitHub repo via scripts/subtree-split.sh).
+  - repo: local
+    hooks:
+      - id: nda-denylist
+        name: NDA denylist (mentor/rubric/answer-key files)
+        entry: scripts/nda-denylist.sh
+        language: script
+        pass_filenames: false

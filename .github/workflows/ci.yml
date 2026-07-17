@@ -1,0 +1,124 @@
+# GitHub Actions is the SSOT CI (Decision #8) — .gitlab-ci.yml is a minimal mirror only.
+name: ci
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+env:
+  UV_VERSION: "0.11.19"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run mypy packages apps
+      - run: uv run lint-imports
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: agentcore-studio-contracts
+            path: packages/contracts/tests
+          - package: agentcore-studio-kb
+            path: packages/kb/tests
+          - package: agentcore-studio-engine
+            path: packages/engine/tests
+          - package: agentcore-studio-workbench
+            path: packages/workbench/tests
+          - package: agentcore-studio-evalhub
+            path: packages/evalhub/tests
+          - package: agentcore-studio-app
+            path: apps/studio/tests
+          - package: root
+            path: tests
+    env:
+      STUDIO_DATABASE_URL: postgresql://studio_app:changeme@localhost:5433/studio_test
+      STUDIO_DATABASE_URL_ADMIN: postgresql://studio_owner:changeme@localhost:5433/studio_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+      - run: uv sync --frozen
+      # Postgres pgvector service, brought up via `docker run` (not the `services:` block) so
+      # docker/postgres-init/*.sql (two-role fence F1/F2 + `CREATE EXTENSION vector`) actually
+      # runs at initdb time — GH Actions `services:` containers start before checkout, so a
+      # bind-mount of repo-tracked init scripts is not reliably available to them yet.
+      - name: Start pgvector test DB
+        run: |
+          docker run -d --name studio-ci-pg \
+            -p 5433:5432 \
+            -e POSTGRES_DB=studio_test \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=postgres \
+            -v "${{ github.workspace }}/docker/postgres-init:/docker-entrypoint-initdb.d:ro" \
+            pgvector/pgvector:pg17
+          for i in $(seq 1 30); do
+            docker exec studio-ci-pg pg_isready -U postgres -d studio_test && break
+            sleep 2
+          done
+      - name: Run package tests
+        run: |
+          if [ "${{ matrix.package }}" = "root" ]; then
+            uv run pytest ${{ matrix.path }} -q
+          else
+            uv run --package ${{ matrix.package }} pytest ${{ matrix.path }} -q
+          fi
+      - name: Stop pgvector test DB
+        if: always()
+        run: docker rm -f studio-ci-pg
+
+  # Red-by-design (F5, F3 anti-tamper closed-set): a leaky kb.search / anti-tamper regression
+  # stays RED until the DE quadrant's fence lands for real. `continue-on-error: true` is
+  # load-bearing — this job must NEVER block a merge (F16 branch-protection required-checks
+  # deliberately excludes this job's check name, see README.md).
+  leak-test:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      STUDIO_DATABASE_URL: postgresql://studio_app:changeme@localhost:5433/studio_test
+      STUDIO_DATABASE_URL_ADMIN: postgresql://studio_owner:changeme@localhost:5433/studio_test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+      - run: uv sync --frozen
+      - name: Start pgvector test DB
+        run: |
+          docker run -d --name studio-ci-pg-leak \
+            -p 5433:5432 \
+            -e POSTGRES_DB=studio_test \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD=postgres \
+            -v "${{ github.workspace }}/docker/postgres-init:/docker-entrypoint-initdb.d:ro" \
+            pgvector/pgvector:pg17
+          for i in $(seq 1 30); do
+            docker exec studio-ci-pg-leak pg_isready -U postgres -d studio_test && break
+            sleep 2
+          done
+      - run: uv run pytest packages/kb/tests/test_leak.py -q
+      - name: Stop pgvector test DB
+        if: always()
+        run: docker rm -f studio-ci-pg-leak
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t studio-kit:ci .

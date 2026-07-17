@@ -1,0 +1,38 @@
+# Minimal GitLab mirror (Decision #8) — GitHub Actions (.github/workflows/ci.yml) is the SSOT
+# full pipeline (lint/mypy/test-matrix/leak-test/build). This mirror only covers lint+test so a
+# GitLab-hosted clone still gets a basic signal; it intentionally does NOT replicate the
+# leak-test or build jobs — keep GitHub as the one place those live to avoid 2-forge drift.
+stages:
+  - lint
+  - test
+
+variables:
+  UV_VERSION: "0.11.19"
+
+.uv_setup: &uv_setup
+  before_script:
+    - curl -LsSf https://astral.sh/uv/${UV_VERSION}/install.sh | sh
+    - export PATH="$HOME/.local/bin:$PATH"
+    - uv sync --frozen
+
+lint:
+  stage: lint
+  image: python:3.14-slim
+  <<: *uv_setup
+  script:
+    - uv run ruff check .
+    - uv run mypy packages apps
+    - uv run lint-imports
+
+test:
+  stage: test
+  image: python:3.14-slim
+  <<: *uv_setup
+  # NO postgres service here: a GitLab `services:` container cannot run this repo's
+  # docker/postgres-init/ scripts (host-path bind mounts aren't supported the way `docker run`
+  # is), so studio_owner/studio_app + the vector extension would never exist and every DB-gated
+  # test would ERROR. Without STUDIO_DATABASE_URL(_ADMIN) the DB-gated tests SKIP cleanly, so this
+  # minimal mirror runs lint + all non-DB tests green. The full DB matrix + leak-test + build live
+  # in GitHub Actions (SSOT, Decision #8), which uses `docker run` + the init-script bind mount.
+  script:
+    - uv run pytest -q

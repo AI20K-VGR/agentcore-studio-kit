@@ -1,0 +1,115 @@
+# 3-profile docker-compose.yml (dev/local stack). Distinct from docker-compose.test.yml (P3/F8 —
+# isolated CI/test-only stack, own project name `studio-test`, port 5433, never touched here).
+#
+#   `docker compose up -d`                — default profile only: pgvector DB (Decision #2).
+#   `docker compose --profile app up -d`  — + this kit's own API image (build ., F4 Dockerfile).
+#   `docker compose --profile obs up -d`  — + Langfuse self-host cluster (R-DI §6 pattern: redis/
+#                                            clickhouse/minio are Langfuse-ONLY dependencies —
+#                                            this kit's own data lives entirely in Postgres,
+#                                            Decision #2 Postgres-everything).
+name: studio
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    ports:
+      - "${STUDIO_POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${STUDIO_POSTGRES_DB:-studio}
+      POSTGRES_USER: ${STUDIO_POSTGRES_SUPERUSER:-postgres}
+      POSTGRES_PASSWORD: ${STUDIO_POSTGRES_SUPERUSER_PASSWORD:-postgres}
+    volumes:
+      - studio_pgdata:/var/lib/postgresql/data
+      # Same init-scripts as docker-compose.test.yml (P3, F1/F2 two-role fence + pgvector
+      # extension) — the dev stack gets the same roles/extension as the test stack, no drift.
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${STUDIO_POSTGRES_SUPERUSER:-postgres} -d ${STUDIO_POSTGRES_DB:-studio}"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  app:
+    build: .
+    profiles: ["app"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    environment:
+      STUDIO_DATABASE_URL: ${STUDIO_DATABASE_URL:-postgresql://studio_app:changeme@postgres:5432/studio}
+      STUDIO_DATABASE_URL_ADMIN: ${STUDIO_DATABASE_URL_ADMIN:-postgresql://studio_owner:changeme@postgres:5432/studio}
+      STUDIO_GEMINI_API_KEY: ${STUDIO_GEMINI_API_KEY:-changeme}
+      STUDIO_ENABLE_TRACING: ${STUDIO_ENABLE_TRACING:-false}
+      STUDIO_USE_FAKE_PROVIDERS: ${STUDIO_USE_FAKE_PROVIDERS:-true}
+
+  # --- obs profile: Langfuse self-host cluster (R-DI §6 COPY-READY #21 — redis/clickhouse/minio
+  # serve Langfuse ONLY; this kit's own queue/store/blob stay Postgres-everything, Decision #2). ---
+  redis:
+    image: redis:7-alpine
+    profiles: ["obs"]
+    volumes:
+      - studio_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24
+    profiles: ["obs"]
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${STUDIO_CLICKHOUSE_PASSWORD:-changeme}
+    volumes:
+      - studio_clickhouse_data:/var/lib/clickhouse
+
+  minio:
+    image: minio/minio
+    profiles: ["obs"]
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${STUDIO_MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${STUDIO_MINIO_ROOT_PASSWORD:-minioadmin}
+    volumes:
+      - studio_minio_data:/data
+
+  langfuse-web:
+    image: langfuse/langfuse:3
+    profiles: ["obs"]
+    depends_on:
+      - postgres
+      - redis
+      - clickhouse
+      - minio
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://${STUDIO_POSTGRES_SUPERUSER:-postgres}:${STUDIO_POSTGRES_SUPERUSER_PASSWORD:-postgres}@postgres:5432/langfuse
+      NEXTAUTH_SECRET: ${STUDIO_LANGFUSE_NEXTAUTH_SECRET:-changeme}
+      SALT: ${STUDIO_LANGFUSE_SALT:-changeme}
+      REDIS_CONNECTION_STRING: redis://redis:6379
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${STUDIO_CLICKHOUSE_PASSWORD:-changeme}
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3
+    profiles: ["obs"]
+    depends_on:
+      - postgres
+      - redis
+      - clickhouse
+      - minio
+    environment:
+      DATABASE_URL: postgresql://${STUDIO_POSTGRES_SUPERUSER:-postgres}:${STUDIO_POSTGRES_SUPERUSER_PASSWORD:-postgres}@postgres:5432/langfuse
+      REDIS_CONNECTION_STRING: redis://redis:6379
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: ${STUDIO_CLICKHOUSE_PASSWORD:-changeme}
+
+volumes:
+  studio_pgdata:
+  studio_redis_data:
+  studio_clickhouse_data:
+  studio_minio_data:
