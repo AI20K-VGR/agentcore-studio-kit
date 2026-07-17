@@ -204,6 +204,9 @@ and no code here substitutes for checking it once the repo exists on GitHub.
 ## Fallback (Hướng A)
 
 If per-package `uv`/mypy/IDE tooling costs the mentor too much time in week 0, the directory tree
-can stay exactly as-is while collapsing to a single root `pyproject.toml` (Hướng A) — the 4-tier
-ownership boundary (packaging + CI-per-package + CODEOWNERS + schema-per-quadrant) still holds
+can stay exactly as-is while collapsing to a single root `pyproject.toml` (Hướng A) — the ownership
+boundary (packaging + CI-per-package + **per-repo permission** + schema-per-quadrant) still holds
 without a true workspace. Not the default; documented here as an explicit escape hatch.
+
+> **Phân phối repo & phân quyền:** kit được tách thành **1 repo cha + 6 submodule** (mỗi domain 1
+> repo private, ranh giới quyền cứng ở tầng git). CODEOWNERS đã gỡ. Quy trình đầy đủ: **`GITFLOWS.md`**.

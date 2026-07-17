@@ -168,12 +168,13 @@ verify: `packages/engine/tests/test_interpreter_contract.py`,
   `grant_app_privileges`), không container DI 3-tầng kiểu AgentSpace anti-pattern
   (`InfrastructureContainer`/`ApplicationContainer`/`ClientsContainer`).
 
-## 8. Ownership — CODEOWNERS, closed node-set
+## 8. Ownership — per-repo permission (multi-repo), closed node-set
 
-- `CODEOWNERS` (root): path → owner, **soft review-gate** — file tự ghi chú "pre-commit chỉ WARN,
-  không phải hard fence, một refactor xuyên-module vẫn hợp lệ". `/packages/kb/ @DE`,
-  `/packages/engine/ @AIE1`, `/packages/workbench/ @SWE`, `/packages/evalhub/ @AIE2`,
-  `/packages/contracts/ @mentor` (2-approval khi đổi), `/apps/ @mentor`.
+- **Ranh giới quyền = per-repo (submodule)**, KHÔNG dùng CODEOWNERS nữa (đã gỡ — trên GitHub-private-
+  Free, CODEOWNERS + branch-protection không thành hard-gate được). Mỗi domain là submodule-repo riêng:
+  `packages/kb`→DE, `packages/engine`→AIE-1, `packages/workbench`→SWE, `packages/evalhub`→AIE-2,
+  `packages/contracts`→mentor (2-approval), `apps/studio`→mentor. Owner có **write**, người khác **read**
+  → chặn CỨNG ở tầng git. Phân quyền + thao tác chi tiết: **`GITFLOWS.md`**.
 - **6 `NodeType` đóng** (`packages/contracts/src/studio_contracts/nodes.py`, `StrEnum`):
   `kb-retrieve`, `llm-step`, `condition`, `tool-call`, `hitl-pause`, `end`. Đây là **nguồn duy nhất**
   — `packages/engine/src/studio_engine/registry.py` import từ đây (không tự định nghĩa lại); thêm
@@ -204,10 +205,9 @@ verify: `packages/engine/tests/test_interpreter_contract.py`,
   `docker-compose.yml`) — **PHẢI đổi** trước khi triển khai bất kỳ môi trường chia sẻ/không phải máy
   dev cá nhân nào. Không có cơ chế rotate tự động trong kit — trách nhiệm người triển khai.
 - **NDA denylist pre-commit** (`.pre-commit-config.yaml` hook `nda-denylist` → `scripts/
-  nda-denylist.sh`) — chặn file mentor/rubric/answer-key commit vào cây kit trước khi có thể lọt vào
-  git-subtree squashed export (`scripts/subtree-split.sh` + `.subtree-allowlist`, xem
-  `docs/system-architecture.md` §7). Đây là "belt-and-suspenders" — denylist chặn từ lúc commit,
-  allowlist chặn lúc export, 2 lớp độc lập.
+  nda-denylist.sh`) — chặn file mentor/rubric/answer-key commit vào bất kỳ repo nào (repo cha hoặc 6
+  submodule mà học viên có quyền write). Cài hook này ở mỗi repo. (Phân phối = multi-repo submodule,
+  xem `GITFLOWS.md` + `docs/system-architecture.md` §7 — cơ chế subtree-squash-1-repo cũ đã bỏ.)
 - **Secrets qua env, không hardcode** — `Settings` (`apps/studio/src/studio_app/settings.py`,
   `pydantic-settings`, prefix `STUDIO_`) đọc mọi khoá (Gemini API key, Langfuse keys, 2 DSN) từ
   `.env`/environment; `.env.example` liệt kê đủ biến, `.env` thật nằm trong `.gitignore`.

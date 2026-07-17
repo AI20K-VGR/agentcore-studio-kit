@@ -1,0 +1,18 @@
+[submodule "packages/contracts"]
+	path = packages/contracts
+	url = git@github.com:hieubui2409/agentcore-studio-contracts.git
+[submodule "apps/studio"]
+	path = apps/studio
+	url = git@github.com:hieubui2409/agentcore-studio-app.git
+[submodule "packages/kb"]
+	path = packages/kb
+	url = git@github.com:hieubui2409/agentcore-studio-kb.git
+[submodule "packages/engine"]
+	path = packages/engine
+	url = git@github.com:hieubui2409/agentcore-studio-engine.git
+[submodule "packages/workbench"]
+	path = packages/workbench
+	url = git@github.com:hieubui2409/agentcore-studio-workbench.git
+[submodule "packages/evalhub"]
+	path = packages/evalhub
+	url = git@github.com:hieubui2409/agentcore-studio-evalhub.git

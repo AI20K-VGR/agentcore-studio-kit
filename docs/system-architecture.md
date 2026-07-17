@@ -278,12 +278,13 @@ Danh sách đầy đủ seam ĐỂ TRỐNG khác (không phải Protocol từ co
   `.gitlab-ci.yml` là mirror tối thiểu (chỉ `lint`+`test`, không leak-test/build — tránh 2-forge
   drift, comment trong file ghi rõ lý do kỹ thuật: GitLab `services:` không bind-mount được
   init-script).
-- **Subtree export** — `scripts/subtree-split.sh`: rsync **chỉ** path trong `.subtree-allowlist` vào
-  thư mục tạm, `git init` + 1 commit duy nhất (squashed, KHÔNG full-history — full-history sẽ lộ file
-  rubric/mentor ở bất kỳ commit cũ nào). `.pre-commit-config.yaml` có hook `nda-denylist`
-  (`scripts/nda-denylist.sh`) chặn file mentor/rubric commit vào cây kit ngay từ đầu. `docs/` (bao
-  gồm chính 2 file này) nằm trong `.subtree-allowlist` — export squashed mang theo cả tài liệu kiến
-  trúc/chuẩn code cho team OJT.
+- **Phân phối = multi-repo submodule** (thay cho subtree-squash-1-repo cũ): repo cha
+  `agentcore-studio-kit` giữ root config + `apps/web`, còn `packages/{contracts,kb,engine,workbench,
+  evalhub}` + `apps/studio` là **6 submodule repo riêng** (private, mỗi owner 1 repo → ranh giới quyền
+  CỨNG ở tầng git, chạy được trên GitHub-private-Free nơi branch-protection bị khoá). Team OJT
+  `git clone --recursive` repo cha rồi `git submodule update --init --recursive`. `.pre-commit-config.yaml`
+  giữ hook `nda-denylist` (`scripts/nda-denylist.sh`) chặn file mentor/rubric commit vào bất kỳ repo nào.
+  **Quy trình đầy đủ (phân quyền + thao tác + pitfalls): `GITFLOWS.md`.**
 
 ## 8. Ownership enforcement — 4 tầng
 
@@ -291,7 +292,7 @@ Danh sách đầy đủ seam ĐỂ TRỐNG khác (không phải Protocol từ co
 |---|---|---|
 | 1. Packaging | Mỗi quadrant là 1 uv workspace member, `[project].name` riêng, dependency riêng | `packages/*/pyproject.toml` (5 file) + `pyproject.toml` root `[tool.uv.workspace]` |
 | 2. CI-per-package | Matrix job `test` chạy `uv run --package <name> pytest <path>` từng package riêng | `.github/workflows/ci.yml` job `test.strategy.matrix` |
-| 3. CODEOWNERS | Path → owner, **soft review-gate** (comment trong file: "pre-commit chỉ WARN, không phải hard fence") | `CODEOWNERS`: `/packages/kb/ @DE`, `/packages/engine/ @AIE1`, `/packages/workbench/ @SWE`, `/packages/evalhub/ @AIE2`, `/packages/contracts/ @mentor`, `/apps/ @mentor` |
+| 3. Per-repo permission (multi-repo) | Mỗi domain là 1 submodule-repo riêng; owner có **write**, người khác chỉ **read** → ranh giới CỨNG ở tầng git (không phải soft review như CODEOWNERS cũ). Contracts = 2-approval. | `.gitmodules` (6 submodule) + collaborator-permission mỗi repo; chi tiết `GITFLOWS.md` §2 |
 | 4. Schema-per-quadrant | Mỗi quadrant `ddl()` riêng, không copy-paste DDL tập trung; `ensure_all_schemas()` direct-import (P5–P8 chỉ điền thân `ddl()` trong package mình, không đụng `apps/studio`) | `core/schema.py::_QUADRANT_SCHEMA_MODULES` |
 
 "Seam antichain" giữ 4 owner làm song song không đụng file: class/`ddl()` stub đã tồn tại từ P1, mỗi

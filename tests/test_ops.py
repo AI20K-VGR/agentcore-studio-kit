@@ -124,64 +124,6 @@ def test_dockerfile_copies_all_member_pyproject_no_editable() -> None:
     assert ".venv" in runtime_stage, "runtime stage must copy the builder's .venv"
 
 
-def test_subtree_squashed_excludes_mentor() -> None:
-    """KHÓA (F13): subtree export SẠCH squashed (KHÔNG full-history `git subtree split` trần),
-    allowlist kit-only path, NDA denylist hook chặn file mentor/rubric."""
-    script = ROOT / "scripts" / "subtree-split.sh"
-    allowlist = ROOT / ".subtree-allowlist"
-    denylist_hook = ROOT / "scripts" / "nda-denylist.sh"
-
-    assert script.exists(), "scripts/subtree-split.sh must exist (F13)"
-    assert allowlist.exists(), ".subtree-allowlist must exist (F13)"
-    assert denylist_hook.exists(), "scripts/nda-denylist.sh must exist (F13 pre-commit guard)"
-
-    script_text = script.read_text()
-    # Must NOT be a bare, un-squashed `git subtree split` (full-history leak risk) — either it
-    # passes --squash explicitly, or it avoids `git subtree split` entirely (snapshot-copy +
-    # fresh git init, which is squashed by construction: exactly 1 commit).
-    bare_subtree_split = re.search(r"git\s+subtree\s+split(?!.*--squash)", script_text)
-    if bare_subtree_split and "--squash" not in script_text:
-        raise AssertionError(
-            "subtree-split.sh must not run a bare `git subtree split` without --squash "
-            "(full history would replay every commit that touched this path, F13)"
-        )
-    assert "git init" in script_text or "--squash" in script_text, (
-        "subtree-split.sh must build a squashed export: either a fresh `git init` snapshot-copy, "
-        "or `git subtree split --squash`"
-    )
-    # A squashed snapshot-copy export must produce exactly one commit.
-    assert re.search(r"git commit", script_text), "subtree-split.sh must commit the squashed snapshot"
-
-    denylist_text = denylist_hook.read_text()
-    for keyword in ("mentor", "rubric"):
-        assert keyword in denylist_text.lower(), f"nda-denylist.sh must guard against '{keyword}' files"
-
-    pre_commit_config = (ROOT / ".pre-commit-config.yaml").read_text()
-    assert "nda-denylist" in pre_commit_config, ".pre-commit-config.yaml must wire the nda-denylist hook"
-
-
-def test_subtree_export_runs_and_is_clean(tmp_path: Path) -> None:
-    """KHÓA (F13, EXECUTION — not just grep): actually RUN subtree-split.sh and assert the export
-    RECURSED the source tree (catches the `rsync --files-from` cancels-implied-`-r` bug that
-    grep-only tests miss), stayed CLEAN (no node_modules/dist/cache), shipped docs, and is
-    squashed to exactly 1 commit. Dual-review catch (@code-reviewer HIGH)."""
-    script = ROOT / "scripts" / "subtree-split.sh"
-    export_dir = tmp_path / "export"
-    proc = _run(["bash", str(script), str(export_dir)])
-    assert proc.returncode == 0, f"subtree-split.sh failed:\n{proc.stdout}\n{proc.stderr}"
-    # tree recursed — the -r bug shipped an EMPTY packages/ (only top-level files copied)
-    pkg_pyproject = export_dir / "packages" / "contracts" / "pyproject.toml"
-    assert pkg_pyproject.is_file(), "export missing package source (rsync -r regression)"
-    assert (export_dir / "apps" / "studio" / "src" / "studio_app" / "app.py").is_file(), "export missing app source"
-    assert (export_dir / "docs" / "ONBOARDING.md").is_file(), "export must ship docs/ (allowlist)"
-    # clean — no build/cache artifacts smuggled into the 'clean' export
-    assert not list(export_dir.rglob("node_modules")), "node_modules must never enter the clean export"
-    assert not list(export_dir.rglob("__pycache__")), "__pycache__ must not enter the export"
-    # squashed — exactly 1 commit, no source history to archaeology through
-    count = _run(["git", "-C", str(export_dir), "rev-list", "--count", "HEAD"])
-    assert count.stdout.strip() == "1", f"export must be squashed to 1 commit, got {count.stdout!r}"
-
-
 def test_nda_denylist_catches_pluralized_and_concatenated() -> None:
     """KHÓA (F13): the NDA denylist must catch pluralized/concatenated mentor-material names
     (`rubrics/`, `mentornotes.md`, `solutions/`, `answer_keys.txt`), not only the `mentor-`/

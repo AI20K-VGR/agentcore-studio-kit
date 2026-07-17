@@ -11,9 +11,9 @@ repos:
         args: [--fix]
       - id: ruff-format
 
-  # F13 — belt-and-suspenders alongside .subtree-allowlist: blocks mentor/rubric/answer-key
-  # files from ever being committed into this kit tree (which gets squash-exported to the OJT
-  # team's own GitHub repo via scripts/subtree-split.sh).
+  # NDA guard: blocks mentor/rubric/answer-key material from ever being committed into ANY of
+  # the studio repos (the parent workspace or the per-domain submodules the OJT team has write
+  # access to). Install this hook in each repo's .pre-commit-config. See GITFLOWS.md.
   - repo: local
     hooks:
       - id: nda-denylist
