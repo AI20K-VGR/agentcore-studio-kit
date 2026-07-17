@@ -16,3 +16,6 @@
 [submodule "packages/evalhub"]
 	path = packages/evalhub
 	url = git@github.com:hieubui2409/agentcore-studio-evalhub.git
+[submodule "apps/web"]
+	path = apps/web
+	url = git@github.com:hieubui2409/agentcore-studio-web.git
