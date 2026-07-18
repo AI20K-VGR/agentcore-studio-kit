@@ -19,7 +19,7 @@ quadrant ĐỂ TRỐNG**:
 | | Cơ chế |
 |---|---|
 | **WIRE (chạy Day-1)** | uv workspace + import-linter, 2-role Postgres + pool-split + RLS fence, schema-per-quadrant DDL + `ensure_all_schemas`, queue SKIP LOCKED, outbox, Gemini-LLM provider, `PgTraceWriter`, Docker multi-stage, CI (GH Actions SSOT + GitLab mirror), git-subtree squashed export |
-| **ĐỂ TRỐNG (spec 4 owner)** | `KbSearchService.search` + `KbPipeline` (DE), 6 node-executor + `interpreter.run` (AIE-1), `graph_lint`/`publish`/`rollback`/`resolve_tenant` (SWE), `EvalHarness`/`LLMJudge`/`compute_scorecard` (AIE-2), `EmbeddingService` 2-impl (AIE-1) |
+| **ĐỂ TRỐNG (spec 4 owner)** | `KbSearchService.search` + `KbPipeline` (DE — Nguyễn Đông Anh), 6 node-executor + `interpreter.run` (AIE-1 — Trần Bá Đạt), `graph_lint`/`publish`/`rollback`/`resolve_tenant` (SWE — Thiệu Quang Minh), `EvalHarness`/`LLMJudge`/`compute_scorecard` (AIE-2 — Lưu Tiến Duy), `EmbeddingService` 2-impl (AIE-1 — Trần Bá Đạt) |
 
 Mỗi seam "để trống" là **`typing.Protocol` (khai ở `packages/contracts`) + impl thân
 `raise NotImplementedError(...)` + test đỏ-by-design** (`pytest.mark.xfail(strict=False)`) — test đỏ
@@ -38,10 +38,10 @@ graph TB
         APP["studio_app<br/>(apps/studio)<br/>owner: mentor"]
     end
     subgraph L1["Layer giữa — 4 quadrant, KHÔNG import chéo"]
-        KB["studio_kb<br/>owner: DE"]
-        ENGINE["studio_engine<br/>owner: AIE-1"]
-        WB["studio_workbench<br/>owner: SWE"]
-        EVAL["studio_evalhub<br/>owner: AIE-2"]
+        KB["studio_kb<br/>owner: DE — Nguyễn Đông Anh"]
+        ENGINE["studio_engine<br/>owner: AIE-1 — Trần Bá Đạt"]
+        WB["studio_workbench<br/>owner: SWE — Thiệu Quang Minh"]
+        EVAL["studio_evalhub<br/>owner: AIE-2 — Lưu Tiến Duy"]
     end
     subgraph L0["Layer đáy — DIP seam"]
         CONTRACTS["studio_contracts<br/>owner: mentor/shared (cần mentor duyệt)"]
@@ -76,10 +76,10 @@ không entry-point discovery).
 
 ```mermaid
 graph LR
-    kb["kb.*<br/>(kb.chunks)"] --> DE["Owner: DE"]
-    wb["wb.*<br/>(wb.recipes, wb.recipe_versions)"] --> SWE["Owner: SWE"]
-    eval["eval.*<br/>(eval.golden_sets, eval.scorecards)"] --> AIE2["Owner: AIE-2"]
-    obs["obs.*<br/>(obs.trace_events, obs.costs, obs.golden_sets)"] --> DEshell["Owner: DE<br/>(shell ship ở composition, P4)"]
+    kb["kb.*<br/>(kb.chunks)"] --> DE["Owner: DE — Nguyễn Đông Anh"]
+    wb["wb.*<br/>(wb.recipes, wb.recipe_versions)"] --> SWE["Owner: SWE — Thiệu Quang Minh"]
+    eval["eval.*<br/>(eval.golden_sets, eval.scorecards)"] --> AIE2["Owner: AIE-2 — Lưu Tiến Duy"]
+    obs["obs.*<br/>(obs.trace_events, obs.costs, obs.golden_sets)"] --> DEshell["Owner: DE — Nguyễn Đông Anh<br/>(shell ship ở composition, P4)"]
     core["core.*<br/>(core.tenants, core.jobs, core.outbox)"] --> Comp["Owner: composition (mentor)"]
 ```
 
@@ -94,12 +94,12 @@ song song không đụng file nhau (xem §8).
 | Package | Import | Distribution (`[project].name`) | Owner | Schema | File cốt lõi (đã verify) |
 |---|---|---|---|---|---|
 | `packages/contracts` | `studio_contracts` | `agentcore-studio-contracts` | mentor/shared (cần mentor duyệt) | — | `nodes.py` (`NodeType` 6-đóng), `recipe.py` (`Recipe`/`Node`/`Edge`), `trace.py` (`TraceEvent`), `kb.py` (`KbSearchResultItem`+`KbSearch` Protocol), `scorecard.py` (`Scorecard`/`CaseResult`), `protocols.py` (`EmbeddingService`/`LLM`/`TraceWriter`) |
-| `packages/kb` | `studio_kb` | `agentcore-studio-kb` | DE | `kb.*` | `schema.py` (DDL + RLS fence), `search.py` (`KbSearchService`, spec), `pipeline.py` (`KbPipeline` 5-method, spec) |
-| `packages/engine` | `studio_engine` | `agentcore-studio-engine` | AIE-1 | — (stateless) | `registry.py` (`NodeType`→executor map), `executors.py` (6 executor, spec), `interpreter.py` (`run()`, spec) |
-| `packages/workbench` | `studio_workbench` | `agentcore-studio-workbench` | SWE | `wb.*` | `schema.py` (DDL), `validator.py` (`graph_lint`, spec), `publish.py` (`publish`/`rollback`, spec), `tenant_wall.py` (`resolve_tenant`, spec) |
-| `packages/evalhub` | `studio_evalhub` | `agentcore-studio-evalhub` | AIE-2 | `eval.*` | `schema.py` (DDL), `harness.py` (`EvalHarness`, spec), `judge.py` (`LLMJudge`, spec), `compute.py` (`compute_scorecard`, spec) |
+| `packages/kb` | `studio_kb` | `agentcore-studio-kb` | DE — Nguyễn Đông Anh | `kb.*` | `schema.py` (DDL + RLS fence), `search.py` (`KbSearchService`, spec), `pipeline.py` (`KbPipeline` 5-method, spec) |
+| `packages/engine` | `studio_engine` | `agentcore-studio-engine` | AIE-1 — Trần Bá Đạt | — (stateless) | `registry.py` (`NodeType`→executor map), `executors.py` (6 executor, spec), `interpreter.py` (`run()`, spec) |
+| `packages/workbench` | `studio_workbench` | `agentcore-studio-workbench` | SWE — Thiệu Quang Minh | `wb.*` | `schema.py` (DDL), `validator.py` (`graph_lint`, spec), `publish.py` (`publish`/`rollback`, spec), `tenant_wall.py` (`resolve_tenant`, spec) |
+| `packages/evalhub` | `studio_evalhub` | `agentcore-studio-evalhub` | AIE-2 — Lưu Tiến Duy | `eval.*` | `schema.py` (DDL), `harness.py` (`EvalHarness`, spec), `judge.py` (`LLMJudge`, spec), `compute.py` (`compute_scorecard`, spec) |
 | `apps/studio` | `studio_app` | `agentcore-studio-app` | mentor (composition) | `core.*` + `obs.*` (shell) | `app.py` (FastAPI factory), `middleware.py` (tenant-context), `core/_db.py` (pool split), `core/schema.py` (`ensure_all_schemas`/`grant_app_privileges`), `core/queue.py`, `core/outbox.py`, `settings.py`, `providers/{gemini,fakes}.py`, `obs/{schema,tracing,trace_writer}.py`, `worker/consumer.py` |
-| `apps/web` | — (Vite/TS) | — | mentor (SWE nở UX sau) | — | `src/App.tsx` (React Flow canvas rỗng), `src/main.tsx` |
+| `apps/web` | — (Vite/TS) | — | mentor (SWE — Thiệu Quang Minh nở UX sau) | — | `src/App.tsx` (React Flow canvas rỗng), `src/main.tsx` |
 
 `evalhub` (không phải `eval`) để tránh shadow builtin Python — comment trong
 `packages/evalhub/pyproject.toml` xác nhận đúng lý do này.

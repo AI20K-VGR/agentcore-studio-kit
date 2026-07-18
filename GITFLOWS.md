@@ -18,22 +18,22 @@ lỗi submodule đến từ đó.
 | **(gốc)** `agentcore-studio-kit` | `hieubui2409/agentcore-studio-kit` | **mentor** | Repo CHA = workspace root: `pyproject.toml` + `uv.lock` + `docker/` + `docker-compose*.yml` + `.github/` (CI + **reusable-workflow** + **composite action**) + `Makefile` + `conftest.py` + `tests/` + `scripts/` + `docs/` + `GITFLOWS.md` + `README.md`. Ghim con trỏ 7 submodule. |
 | `packages/contracts` | `agentcore-studio-contracts` | **mentor** (đổi cần mentor duyệt) | `studio_contracts` — hợp đồng chung (Recipe/TraceEvent/Scorecard/NodeType/Protocol). Ai cũng phụ thuộc → đổi = mentor duyệt. |
 | `apps/studio` | `agentcore-studio-app` | **mentor** | `studio_app` — composition root: DB pool-split, RLS fence wiring, middleware, providers, obs, queue. |
-| `packages/kb` | `agentcore-studio-kb` | **DE** | `studio_kb` — KB pipeline + `kb.search` fence-DATA + `kb.chunks` RLS. |
-| `packages/engine` | `agentcore-studio-engine` | **AIE-1** | `studio_engine` — interpreter + 6 node executors. |
-| `packages/workbench` | `agentcore-studio-workbench` | **SWE** | `studio_workbench` — validator/graph-lint + publish + Tenant-Wall. |
-| `packages/evalhub` | `agentcore-studio-evalhub` | **AIE-2** | `studio_evalhub` — eval harness + judge + scorecard-compute. |
-| `apps/web` | `agentcore-studio-web` | **mentor** (SWE sau) | Frontend Vite + React Flow. **App JS độc lập — KHÔNG thuộc uv workspace** (root pyproject `[tool.uv.workspace].exclude`). CI standalone, không cần PAT/reconstruct. |
+| `packages/kb` | `agentcore-studio-kb` | **DE — Nguyễn Đông Anh** | `studio_kb` — KB pipeline + `kb.search` fence-DATA + `kb.chunks` RLS. |
+| `packages/engine` | `agentcore-studio-engine` | **AIE-1 — Trần Bá Đạt** | `studio_engine` — interpreter + 6 node executors. |
+| `packages/workbench` | `agentcore-studio-workbench` | **SWE — Thiệu Quang Minh** | `studio_workbench` — validator/graph-lint + publish + Tenant-Wall. |
+| `packages/evalhub` | `agentcore-studio-evalhub` | **AIE-2 — Lưu Tiến Duy** | `studio_evalhub` — eval harness + judge + scorecard-compute. |
+| `apps/web` | `agentcore-studio-web` | **mentor** (SWE — Thiệu Quang Minh sau) | Frontend Vite + React Flow. **App JS độc lập — KHÔNG thuộc uv workspace** (root pyproject `[tool.uv.workspace].exclude`). CI standalone, không cần PAT/reconstruct. |
 
 ```
 agentcore-studio-kit  (repo CHA — mentor)
 ├── pyproject.toml · uv.lock · docker/ · .github/ · Makefile · conftest.py · tests/   ← ở repo cha
 ├── packages/contracts  ─▶ submodule agentcore-studio-contracts   (mentor, đổi cần duyệt)
 ├── apps/studio         ─▶ submodule agentcore-studio-app         (mentor)
-├── packages/kb         ─▶ submodule agentcore-studio-kb          (DE)
-├── packages/engine     ─▶ submodule agentcore-studio-engine      (AIE-1)
-├── packages/workbench  ─▶ submodule agentcore-studio-workbench   (SWE)
-├── packages/evalhub    ─▶ submodule agentcore-studio-evalhub     (AIE-2)
-└── apps/web            ─▶ submodule agentcore-studio-web          (mentor→SWE, JS độc lập)
+├── packages/kb         ─▶ submodule agentcore-studio-kb          (DE — Nguyễn Đông Anh)
+├── packages/engine     ─▶ submodule agentcore-studio-engine      (AIE-1 — Trần Bá Đạt)
+├── packages/workbench  ─▶ submodule agentcore-studio-workbench   (SWE — Thiệu Quang Minh)
+├── packages/evalhub    ─▶ submodule agentcore-studio-evalhub     (AIE-2 — Lưu Tiến Duy)
+└── apps/web            ─▶ submodule agentcore-studio-web          (mentor→SWE Thiệu Quang Minh, JS độc lập)
 ```
 
 ---
@@ -45,12 +45,12 @@ ranh giới CỨNG — không có token = không push được, không phải ch
 
 | Người | Repo có **WRITE** | Repo chỉ **READ** |
 |---|---|---|
-| **DE** | `agentcore-studio-kb` | cha, contracts, app, engine, workbench, evalhub |
-| **AIE-1** | `agentcore-studio-engine` | cha, contracts, app, kb, workbench, evalhub |
-| **SWE** | `agentcore-studio-workbench` | cha, contracts, app, kb, engine, evalhub |
-| **AIE-2** | `agentcore-studio-evalhub` | cha, contracts, app, kb, engine, workbench |
+| **DE — Nguyễn Đông Anh** | `agentcore-studio-kb` | cha, contracts, app, engine, workbench, evalhub |
+| **AIE-1 — Trần Bá Đạt** | `agentcore-studio-engine` | cha, contracts, app, kb, workbench, evalhub |
+| **SWE — Thiệu Quang Minh** | `agentcore-studio-workbench` **+ `agentcore-studio-web`** | cha, contracts, app, kb, engine, evalhub |
+| **AIE-2 — Lưu Tiến Duy** | `agentcore-studio-evalhub` | cha, contracts, app, kb, engine, workbench |
 | **mentor** | **tất cả** (admin) | — |
-| _web (nếu SWE làm)_ | `agentcore-studio-web` | mentor giữ mặc định; cấp SWE `push` khi tới sprint canvas |
+| _web (SWE — Thiệu Quang Minh)_ | `agentcore-studio-web` | mentor giữ **ownership**; SWE có `push` (mở rộng canvas ở sprint sau) |
 
 **Contracts (mentor-approval):** không cấp write cho kỹ sư OJT. Đổi contract → mở PR ở
 `agentcore-studio-contracts`, cần **mentor** approve (đây là seam chung, đổi bừa là vỡ cả 4 người).

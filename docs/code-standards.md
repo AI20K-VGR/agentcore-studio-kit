@@ -172,7 +172,7 @@ verify: `packages/engine/tests/test_interpreter_contract.py`,
 
 - **Ranh giới quyền = per-repo (submodule)**, KHÔNG dùng CODEOWNERS nữa (đã gỡ — trên GitHub-private-
   Free, CODEOWNERS + branch-protection không thành hard-gate được). Mỗi domain là submodule-repo riêng:
-  `packages/kb`→DE, `packages/engine`→AIE-1, `packages/workbench`→SWE, `packages/evalhub`→AIE-2,
+  `packages/kb`→DE (Nguyễn Đông Anh), `packages/engine`→AIE-1 (Trần Bá Đạt), `packages/workbench`→SWE (Thiệu Quang Minh), `packages/evalhub`→AIE-2 (Lưu Tiến Duy),
   `packages/contracts`→mentor (đổi cần duyệt), `apps/studio`→mentor. Owner có **write**, người khác **read**
   → chặn CỨNG ở tầng git. Phân quyền + thao tác chi tiết: **`GITFLOWS.md`**.
 - **6 `NodeType` đóng** (`packages/contracts/src/studio_contracts/nodes.py`, `StrEnum`):

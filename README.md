@@ -31,10 +31,10 @@ make lint       # ruff check . && mypy strict (packages + apps) && lint-imports 
 ```
 packages/
   contracts/   studio_contracts   — frozen pydantic contracts (owner: mentor/shared, mentor-approval)
-  kb/          studio_kb          — KB pipeline + kb.search fence-DATA (owner: DE)
-  engine/      studio_engine      — interpreter + 6 node executors (owner: AIE-1, stateless)
-  workbench/   studio_workbench   — form+canvas UI wiring, Tenant-Wall (owner: SWE)
-  evalhub/     studio_evalhub     — eval harness, judge, scorecard (owner: AIE-2)
+  kb/          studio_kb          — KB pipeline + kb.search fence-DATA (owner: DE — Nguyễn Đông Anh)
+  engine/      studio_engine      — interpreter + 6 node executors (owner: AIE-1 — Trần Bá Đạt, stateless)
+  workbench/   studio_workbench   — form+canvas UI wiring, Tenant-Wall (owner: SWE — Thiệu Quang Minh)
+  evalhub/     studio_evalhub     — eval harness, judge, scorecard (owner: AIE-2 — Lưu Tiến Duy)
 apps/
   studio/      studio_app         — composition root (owner: mentor)
   web/         (Vite/TS, P10)     — NOT a Python workspace member
@@ -56,10 +56,10 @@ là nơi DUY NHẤT được import mọi thứ, gom 4 xưởng lại thành app
 graph TD
     WEB["apps/web — Vite + React Flow (mentor)"]
     APP["apps/studio · studio_app (mentor)<br/>app.py · middleware · core/_db · core/schema · queue · providers · obs"]
-    KB["packages/kb · studio_kb (DE)<br/>search.py · pipeline.py · schema.py (kb.chunks + RLS)"]
-    ENG["packages/engine · studio_engine (AIE-1)<br/>interpreter.py · executors.py · registry.py"]
-    WB["packages/workbench · studio_workbench (SWE)<br/>validator.py · publish.py · tenant_wall.py · schema.py (wb.*)"]
-    EVAL["packages/evalhub · studio_evalhub (AIE-2)<br/>harness.py · judge.py · compute.py · schema.py (eval.*)"]
+    KB["packages/kb · studio_kb (DE — Nguyễn Đông Anh)<br/>search.py · pipeline.py · schema.py (kb.chunks + RLS)"]
+    ENG["packages/engine · studio_engine (AIE-1 — Trần Bá Đạt)<br/>interpreter.py · executors.py · registry.py"]
+    WB["packages/workbench · studio_workbench (SWE — Thiệu Quang Minh)<br/>validator.py · publish.py · tenant_wall.py · schema.py (wb.*)"]
+    EVAL["packages/evalhub · studio_evalhub (AIE-2 — Lưu Tiến Duy)<br/>harness.py · judge.py · compute.py · schema.py (eval.*)"]
     CON["packages/contracts · studio_contracts (mentor/shared)<br/>Recipe · TraceEvent · KbSearchResultItem · Scorecard · NodeType(6) · Protocol(KbSearch/LLM/EmbeddingService/TraceWriter)"]
 
     WEB -. HTTP .-> APP
@@ -147,10 +147,10 @@ needs the mentor-approval rule (see `packages/contracts/`).
 
   | Owner | Package (import name) | Owns | Contract seam (bút) | Must NOT touch |
   |---|---|---|---|---|
-  | **DE** | `packages/kb` (`studio_kb`) | KB pipeline (doc-factory, chunk/embed/index, fence-DATA `kb.search`, consent-purge), trace sink, cost table, golden-set | trace-event schema · `kb.search` API | Workbench/validator/Tenant-Wall (SWE); interpreter/executor/fence-executor/EmbeddingService (AIE-1); eval harness/judge/scorecard-render (AIE-2) |
-  | **SWE** | `packages/workbench` (`studio_workbench`) | Workbench UI (form+canvas wiring), recipe validator/graph-lint, publish/eval-gate wiring, version/rollback, Tenant-Wall (INV-1) | recipe schema | KB pipeline/`kb.search`-filter/trace-sink/golden-set (DE); interpreter/executor/fence-executor (AIE-1); eval-harness/judge/scorecard-render (AIE-2 — SWE only wires the gate that *reads* the verdict) |
-  | **AIE-1** | `packages/engine` (`studio_engine`) | Interpreter, 6 node executors, `EmbeddingService` 2-impl, fence-EXECUTOR | consumes `kb.search` + `EmbeddingService` (no contract bút) | Workbench/Tenant-Wall/eval-gate-wiring (SWE); doc-factory/`kb.search`-filter/trace-sink/golden-set (DE — consumes only); eval-harness/judge/scorecard (AIE-2 — supplies citations only) |
-  | **AIE-2** | `packages/evalhub` (`studio_evalhub`) | Eval harness, LLM-judge + agreement-check, scorecard render, trace UX | scorecard format | eval-gate-wiring/publish/rollback (SWE — AIE-2 only supplies the verdict); golden-set (DE — consumes only); interpreter/executor/fence-executor/EmbeddingService (AIE-1 — consumes citations only); Tenant-Wall/INV-1 |
+  | **DE — Nguyễn Đông Anh** | `packages/kb` (`studio_kb`) | KB pipeline (doc-factory, chunk/embed/index, fence-DATA `kb.search`, consent-purge), trace sink, cost table, golden-set | trace-event schema · `kb.search` API | Workbench/validator/Tenant-Wall (SWE); interpreter/executor/fence-executor/EmbeddingService (AIE-1); eval harness/judge/scorecard-render (AIE-2) |
+  | **SWE — Thiệu Quang Minh** | `packages/workbench` (`studio_workbench`) | Workbench UI (form+canvas wiring), recipe validator/graph-lint, publish/eval-gate wiring, version/rollback, Tenant-Wall (INV-1) | recipe schema | KB pipeline/`kb.search`-filter/trace-sink/golden-set (DE); interpreter/executor/fence-executor (AIE-1); eval-harness/judge/scorecard-render (AIE-2 — SWE only wires the gate that *reads* the verdict) |
+  | **AIE-1 — Trần Bá Đạt** | `packages/engine` (`studio_engine`) | Interpreter, 6 node executors, `EmbeddingService` 2-impl, fence-EXECUTOR | consumes `kb.search` + `EmbeddingService` (no contract bút) | Workbench/Tenant-Wall/eval-gate-wiring (SWE); doc-factory/`kb.search`-filter/trace-sink/golden-set (DE — consumes only); eval-harness/judge/scorecard (AIE-2 — supplies citations only) |
+  | **AIE-2 — Lưu Tiến Duy** | `packages/evalhub` (`studio_evalhub`) | Eval harness, LLM-judge + agreement-check, scorecard render, trace UX | scorecard format | eval-gate-wiring/publish/rollback (SWE — AIE-2 only supplies the verdict); golden-set (DE — consumes only); interpreter/executor/fence-executor/EmbeddingService (AIE-1 — consumes citations only); Tenant-Wall/INV-1 |
 
   Full cross-owner boundary detail: `plans/260717-1516-studio-kit-template/research/studio-spec-and-workspace.md`
   §A4. `apps/studio` (composition root, `core.*`+`obs.*` schema) and `apps/web` (Vite/React Flow
