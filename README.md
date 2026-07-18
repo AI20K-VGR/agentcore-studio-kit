@@ -100,7 +100,7 @@ sequenceDiagram
         Note over MW,DB: KHÔNG set → NULL → 0 rows (fail-closed)
     end
     MW->>DB: kb.search chạy CÙNG conn đó
-    DB-->>MW: chỉ rows tenant = X (USING); ghi sai tenant bị chặn (WITH CHECK)
+    DB-->>MW: chỉ rows tenant = X (USING) — ghi sai tenant bị chặn (WITH CHECK)
     MW-->>C: response — commit ở cuối txn (SET LOCAL tự reset)
 ```
 
