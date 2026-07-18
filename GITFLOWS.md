@@ -74,17 +74,18 @@ done
 ### Cách mentor cấp quyền (gh CLI)
 
 ```bash
-# ví dụ cấp cho DE quyền push vào repo kb (giả sử username GitHub của DE là "de-github-user")
-gh api -X PUT repos/hieubui2409/agentcore-studio-kb/collaborators/de-github-user \
+# ví dụ cấp cho DE (Nguyễn Đông Anh, username GitHub "DongAnh2704") quyền push vào repo kb
+gh api -X PUT repos/hieubui2409/agentcore-studio-kb/collaborators/DongAnh2704 \
   -f permission=push        # push = read+write; các mức: pull|triage|push|maintain|admin
 
 # read-only ở các repo khác:
-gh api -X PUT repos/hieubui2409/agentcore-studio-contracts/collaborators/de-github-user -f permission=pull
-gh api -X PUT repos/hieubui2409/agentcore-studio-app/collaborators/de-github-user       -f permission=pull
-gh api -X PUT repos/hieubui2409/agentcore-studio-kit/collaborators/de-github-user       -f permission=pull
+gh api -X PUT repos/hieubui2409/agentcore-studio-contracts/collaborators/DongAnh2704 -f permission=pull
+gh api -X PUT repos/hieubui2409/agentcore-studio-app/collaborators/DongAnh2704       -f permission=pull
+gh api -X PUT repos/hieubui2409/agentcore-studio-kit/collaborators/DongAnh2704       -f permission=pull
 ```
-Làm tương tự cho AIE-1→engine, SWE→workbench, AIE-2→evalhub. (Hoặc dùng UI: repo → Settings →
-Collaborators → Add people.)
+Làm tương tự cho AIE-1 (Trần Bá Đạt · `TranBaDat2607`)→engine, SWE (Thiệu Quang Minh · `Dozyboy`)→workbench **+ web**,
+AIE-2 (Lưu Tiến Duy · `dholmes0207`)→evalhub. (Hoặc dùng UI: repo → Settings → Collaborators → Add people.)
+Bảng username đầy đủ: `agentcore-studio/03-role-tracks/team-roster.md`.
 
 > Mẹo: dùng **GitHub Team** thay vì add từng người nếu sau này nhiều học viên — gán team-permission
 > 1 lần cho mỗi repo.
