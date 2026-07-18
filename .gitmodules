@@ -19,3 +19,6 @@
 [submodule "apps/web"]
 	path = apps/web
 	url = git@github.com:hieubui2409/agentcore-studio-web.git
+[submodule "docs/requirements"]
+	path = docs/requirements
+	url = git@github.com:hieubui2409/ai20k-batch2-requirements.git
