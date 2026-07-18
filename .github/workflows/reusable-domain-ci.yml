@@ -63,10 +63,12 @@ jobs:
           git config --global url."${BASE}".insteadOf "https://github.com/"
           git config --global --add url."${BASE}".insteadOf "git@github.com:"
           git config --global --add url."${BASE}".insteadOf "ssh://git@github.com/"
-          # Clone parent rồi init submodule TRỪ apps/web (web là app JS riêng, không thuộc uv
-          # workspace → không cần dựng, PAT cũng không cần quyền đọc repo web).
+          # Clone parent rồi init ALLOWLIST đúng 6 submodule uv-workspace (Python). apps/web (JS),
+          # docs/requirements (đề bài), agentcore-report… KHÔNG dựng — PAT read-only không cần quyền
+          # đọc chúng. Allowlist (thay denylist) → submodule mới mặc định không phá reconstruct.
           git clone "https://github.com/${PARENT_REPO}.git" workspace
-          git -C workspace -c submodule."apps/web".update=none submodule update --init --recursive
+          git -C workspace submodule update --init --recursive -- \
+            packages/contracts packages/kb packages/engine packages/workbench packages/evalhub apps/studio
           git config --global --remove-section url."${BASE}" || true
 
       - name: Overlay PR code into workspace

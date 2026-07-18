@@ -23,7 +23,10 @@ runs:
         git config --global url."${BASE}".insteadOf "https://github.com/"
         git config --global --add url."${BASE}".insteadOf "git@github.com:"
         git config --global --add url."${BASE}".insteadOf "ssh://git@github.com/"
-        # apps/web KHÔNG thuộc uv workspace (app JS riêng) → parent CI không cần, và PAT read-only
-        # không cần quyền đọc repo web. Bỏ qua web khi init (update=none).
-        git -c submodule."apps/web".update=none submodule update --init --recursive
+        # ALLOWLIST: chỉ init đúng 6 submodule uv-workspace (Python). Mọi submodule khác — apps/web
+        # (app JS riêng), docs/requirements (đề bài), agentcore-report (báo cáo TTS)… — KHÔNG init:
+        # parent CI không cần dựng chúng và PAT read-only không cần quyền đọc chúng. Allowlist (thay
+        # denylist cũ) → submodule mới mặc định VÔ HẠI với CI; chỉ khi thêm uv-member thật mới sửa list.
+        git submodule update --init --recursive -- \
+          packages/contracts packages/kb packages/engine packages/workbench packages/evalhub apps/studio
         git config --global --remove-section url."${BASE}" || true
