@@ -22,3 +22,12 @@
 [submodule "docs/requirements"]
 	path = docs/requirements
 	url = git@github.com:hieubui2409/ai20k-batch2-requirements.git
+# contract-delta (F-53) — docs/reports submodule (agentcore-report, TTS-write)
+#   before:    kit had no TTS-write report mount; TTS reports lived nowhere shared.
+#   after:     docs/reports = agentcore-report (TTS-write, 0-secret, report-ci enforces nda-generic + author≠mentor).
+#   who:       mentor (v.hieubt15@vinsmartfuture.tech) — cockpit/kit owner; TTS get write on agentcore-report only.
+#   migration: CI init-submodules allowlist (action.yml:~30) does NOT init docs/reports → parent CI unaffected;
+#              TTS clone --recursive fetches their own report area; mentor cockpit reads it read-only via Actions API.
+[submodule "docs/reports"]
+	path = docs/reports
+	url = git@github.com:hieubui2409/agentcore-report.git
