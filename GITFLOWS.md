@@ -67,7 +67,7 @@ cần **1 fine-grained PAT read-only**. `web` KHÔNG cần (standalone).
 #    - Permissions: Contents = Read-only ; Expiration: 90 ngày (nhớ rotate)
 # 2. Set secret cho 7 repo (tài khoản user không có org-secret dùng chung → set từng repo):
 for r in kit contracts kb engine workbench evalhub app; do
-  echo "$PAT" | gh secret set STUDIO_CI_READ_PAT --repo hieubui2409/agentcore-studio-$r
+  echo "$PAT" | gh secret set PAT --repo hieubui2409/agentcore-studio-$r
 done
 ```
 
@@ -250,7 +250,7 @@ Khi push/PR vào 1 repo domain, reusable workflow: ① checkout code PR của re
 cha private + submodule bằng PAT read-only** → ③ đắp code PR đè lên `domain_path` → ④ `uv sync
 --frozen` + bật pgvector + `pytest <domain>/tests`.
 
-**Không lộ token:** PAT chỉ nằm trong Secret `STUDIO_CI_READ_PAT` (GitHub mask khỏi log), chỉ nhét
+**Không lộ token:** PAT chỉ nằm trong Secret `PAT` (GitHub mask khỏi log), chỉ nhét
 vào `git config url.insteadOf` (không `echo`), unset ngay sau clone; fine-grained Contents=Read-only;
 PR từ **fork** không được cấp secret → suy biến thành `lint-shallow`. Cách set secret: xem §2.
 

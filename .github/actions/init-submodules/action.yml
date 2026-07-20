@@ -16,7 +16,7 @@ runs:
         GH_PAT: ${{ inputs.pat }}
       run: |
         if [ -z "${GH_PAT}" ]; then
-          echo "::error::Thiếu PAT — truyền secrets.STUDIO_CI_READ_PAT vào input 'pat'."
+          echo "::error::Thiếu PAT — truyền secrets.PAT vào input 'pat'."
           exit 1
         fi
         BASE="https://x-access-token:${GH_PAT}@github.com/"

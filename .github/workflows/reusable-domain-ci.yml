@@ -24,7 +24,7 @@ on:
         required: true
         type: string
     secrets:
-      STUDIO_CI_READ_PAT:
+      PAT:
         description: Fine-grained PAT read-only để clone repo cha private + submodule
         required: true
 
@@ -53,10 +53,10 @@ jobs:
 
       - name: Reconstruct workspace (private parent + submodules)
         env:
-          GH_PAT: ${{ secrets.STUDIO_CI_READ_PAT }}
+          GH_PAT: ${{ secrets.PAT }}
         run: |
           if [ -z "${GH_PAT}" ]; then
-            echo "::error::Thiếu secret STUDIO_CI_READ_PAT (repo con cần set + secrets: inherit)."
+            echo "::error::Thiếu secret PAT (repo con cần set + secrets: inherit)."
             exit 1
           fi
           BASE="https://x-access-token:${GH_PAT}@github.com/"
