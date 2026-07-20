@@ -1,27 +1,27 @@
 [submodule "packages/contracts"]
 	path = packages/contracts
-	url = git@github.com:hieubui2409/agentcore-studio-contracts.git
+	url = git@github.com:AI20K-VGR/agentcore-studio-contracts.git
 [submodule "apps/studio"]
 	path = apps/studio
-	url = git@github.com:hieubui2409/agentcore-studio-app.git
+	url = git@github.com:AI20K-VGR/agentcore-studio-app.git
 [submodule "packages/kb"]
 	path = packages/kb
-	url = git@github.com:hieubui2409/agentcore-studio-kb.git
+	url = git@github.com:AI20K-VGR/agentcore-studio-kb.git
 [submodule "packages/engine"]
 	path = packages/engine
-	url = git@github.com:hieubui2409/agentcore-studio-engine.git
+	url = git@github.com:AI20K-VGR/agentcore-studio-engine.git
 [submodule "packages/workbench"]
 	path = packages/workbench
-	url = git@github.com:hieubui2409/agentcore-studio-workbench.git
+	url = git@github.com:AI20K-VGR/agentcore-studio-workbench.git
 [submodule "packages/evalhub"]
 	path = packages/evalhub
-	url = git@github.com:hieubui2409/agentcore-studio-evalhub.git
+	url = git@github.com:AI20K-VGR/agentcore-studio-evalhub.git
 [submodule "apps/web"]
 	path = apps/web
-	url = git@github.com:hieubui2409/agentcore-studio-web.git
+	url = git@github.com:AI20K-VGR/agentcore-studio-web.git
 [submodule "docs/requirements"]
 	path = docs/requirements
-	url = git@github.com:hieubui2409/ai20k-batch2-requirements.git
+	url = git@github.com:AI20K-VGR/ai20k-batch2-requirements.git
 # contract-delta (F-53) — docs/reports submodule (agentcore-report, TTS-write)
 #   before:    kit had no TTS-write report mount; TTS reports lived nowhere shared.
 #   after:     docs/reports = agentcore-report (TTS-write, 0-secret, report-ci enforces nda-generic + author≠mentor).
@@ -30,4 +30,4 @@
 #              TTS clone --recursive fetches their own report area; mentor cockpit reads it read-only via Actions API.
 [submodule "docs/reports"]
 	path = docs/reports
-	url = git@github.com:hieubui2409/agentcore-report.git
+	url = git@github.com:AI20K-VGR/agentcore-report.git
