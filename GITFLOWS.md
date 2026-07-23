@@ -121,20 +121,31 @@ Ví dụ **DE** hiện thực `kb.search`:
 ```bash
 cd packages/kb                  # đi vào submodule (đây là repo agentcore-studio-kb)
 
-# ⚠️ BẮT BUỘC: submodule mặc định ở DETACHED HEAD. Về nhánh trước khi sửa:
+# ⚠️ BẮT BUỘC: submodule mặc định ở DETACHED HEAD. Về main + đồng bộ trước:
 git checkout main
 git pull                        # lấy bản mới nhất
+
+# ⚠️ KHÔNG commit thẳng main — main là nhánh ĐƯỢC BẢO VỆ (callout dưới). Mở nhánh việc:
+git checkout -b feat/kb-search  # nhánh <type>/<scope>-<mô-tả> tách từ main
 
 # ... sửa src/studio_kb/search.py ...
 
 git add -A
 git commit -m "feat(kb): implement kb.search fail-closed retrieval"
-git push                        # push vào repo agentcore-studio-kb
-gh pr create                    # (tuỳ chọn) mở PR trong repo kb để mentor review
+git push -u origin feat/kb-search   # push NHÁNH (KHÔNG push main)
+gh pr create --fill --base main     # BẮT BUỘC: main chỉ vào qua PR
+# → mentor/CI review → merge PR → main tiến. TUYỆT ĐỐI không tự push vào main.
 ```
 
-→ **Xong phần việc của bạn.** Bạn KHÔNG cần đụng repo cha. Đồng đội `git submodule update --remote
-packages/kb` là thấy code bạn.
+→ **Sau khi PR merge, xong phần việc của bạn.** Bạn KHÔNG cần đụng repo cha. Đồng đội `git submodule
+update --remote packages/kb` là thấy code bạn.
+
+> **Vì sao PR chứ không `git push` thẳng main?** Harness cài ở repo bạn liệt `main` là **protected
+> branch** (`harness/data/protected-branches.yaml`); pre-push `protected_ref_guard` **chặn** push
+> thẳng vào `main` — nó đòi artifact merge-grade y như một PR đã review. Trên GitHub private-free,
+> branch-protection/CODEOWNERS-hard-gate bị khoá (xem đầu tài liệu §intro), nên **harness-guard chính
+> là lớp thay thế**: kỷ luật "vào main chỉ qua PR" do guard enforce ở tầng local, không phải GitHub.
+> Đó là lý do luồng trên đi nhánh + `gh pr create` thay vì `git push` vào main.
 
 ### Chạy test (cần CẢ workspace)
 
@@ -163,6 +174,10 @@ git add packages/kb
 git commit -m "chore: bump kb → <sha ngắn>"
 git push                                      # push repo cha
 ```
+
+> ⚠️ **Repo cha cũng có `main` protected.** Nếu harness-guard bật ở máy mentor, bump pointer cũng đi
+> **nhánh + PR** như §4 (`git checkout -b chore/bump-kb` → push nhánh → `gh pr create`), không `git
+> push` thẳng main. Chỉ bỏ qua khi `protected-branches.yaml` **không** liệt `main` (guard tắt).
 
 > **Không bắt buộc bump mỗi lần.** Gom lại, bump khi muốn chốt một "phiên bản workspace" (ví dụ cuối
 > ngày, trước demo). Repo con vẫn tiến hoá độc lập.
@@ -202,17 +217,18 @@ git submodule update --remote --merge
 
 | Triệu chứng | Nguyên nhân | Cách tránh/sửa |
 |---|---|---|
-| Commit trong submodule "biến mất" | Sửa khi submodule ở **detached HEAD** | Luôn `git checkout main` **trước khi** sửa trong submodule |
+| Commit trong submodule "biến mất" | Sửa khi submodule ở **detached HEAD** | `git checkout main` **rồi** `git checkout -b <nhánh>` **trước khi** sửa |
 | `ModuleNotFoundError: studio_contracts` khi test | Quên init submodule | `git submodule update --init --recursive` rồi `uv sync` |
 | Thấy code cũ, tưởng đồng đội chưa làm | Quên `submodule update` sau `git pull` | `git pull && git submodule update --init --recursive` |
 | Mentor bump pointer nhưng đồng đội build lỗi | Bump con trỏ tới commit submodule **chưa push** | Luôn `git push` trong submodule **TRƯỚC** khi bump pointer ở cha |
 | `uv sync` báo thiếu member | 1 submodule chưa được init (empty dir) | `git submodule update --init <path>` |
 | Đổi contract xong 1 domain lỗi type | Version drift giữa các submodule | Sau khi đổi contract, `make lint` + `make test-int` ở cha |
 | Không push được vào repo domain của mình | Chưa được cấp quyền collaborator | Mentor chạy `gh api ... collaborators ... -f permission=push` |
+| `git push` main bị guard chặn (đòi artifact merge) | `main` là protected branch (harness `protected_ref_guard`) | Đi **nhánh + `gh pr create`**; KHÔNG push thẳng main (§4) |
 
 ### Quy tắc vàng
-1. **Sửa submodule:** `cd <path>` → `git checkout main` → sửa → commit → **push** → (PR).
-2. **Bump ở cha:** chỉ sau khi submodule đã **push**. `git add <path>` → commit → push.
+1. **Sửa submodule:** `cd <path>` → `git checkout main && git pull` → `git checkout -b <nhánh>` → sửa → commit → **push nhánh** → **`gh pr create` (BẮT BUỘC)** → mentor/CI merge. **KHÔNG** commit/push thẳng `main` — guard chặn.
+2. **Bump ở cha:** chỉ sau khi submodule đã **merge + push**. `git add <path>` → commit → (nhánh + PR nếu cha cũng guard main).
 3. **Pull:** `git pull` **luôn đi kèm** `git submodule update --init --recursive`.
 
 ---
