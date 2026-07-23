@@ -1,7 +1,7 @@
 # Reusable workflow (workflow_call) — LOGIC RECONSTRUCT DUY NHẤT cho MỌI repo con.
 #
 # Đây là "kế thừa" của GitHub Actions: mỗi repo con chỉ có 1 stub ~10 dòng gọi vào đây
-# (uses: hieubui2409/agentcore-studio-kit/.github/workflows/reusable-domain-ci.yml@main),
+# (uses: AI20K-VGR/agentcore-studio-kit/.github/workflows/reusable-domain-ci.yml@main),
 # truyền domain_path/domain_package. Sửa quy trình CI 1 chỗ → cả 6 repo con ăn theo.
 #
 # Khi được gọi qua workflow_call, `github` context là của CALLER (repo con): actions/checkout
@@ -30,7 +30,7 @@ on:
 
 env:
   UV_VERSION: "0.11.19"
-  PARENT_REPO: hieubui2409/agentcore-studio-kit
+  PARENT_REPO: AI20K-VGR/agentcore-studio-kit
 
 jobs:
   # Đầy đủ: chỉ chạy khi có secret (push/PR nội bộ, không phải fork).
