@@ -4,16 +4,19 @@ Tài liệu này mô tả **cách 4 kỹ sư OJT + mentor làm việc** khi `age
 thành **1 repo cha (workspace) + 7 repo con (submodule)**. Đọc kỹ phần "Pitfalls" ở cuối — 90%
 lỗi submodule đến từ đó.
 
-> Vì sao multi-repo thay vì monorepo? Để **ranh giới quyền CỨNG ở tầng git** (bạn A không push
-> được vào repo của bạn B) — hoạt động trên **GitHub private + Free**, nơi branch-protection /
-> CODEOWNERS-hard-gate bị khoá (cần Pro/Team hoặc public). CODEOWNERS đã được **gỡ bỏ** vì trên
-> private-free nó chỉ chạy mức mềm (auto-request reviewer), không chặn được gì.
+> Vì sao multi-repo? Ban đầu để **ranh giới quyền cứng ở tầng git** khi repo còn **private + Free**
+> (nơi branch-protection / CODEOWNERS-hard-gate bị khoá, cần Pro/Team hoặc public).
+> **Từ 2026-07-24 các repo studio đã chuyển PUBLIC** → branch-protection + CODEOWNERS-hard-gate **mở
+> khoá free**, nên hàng rào chuyển từ tầng *git-push* sang tầng *PR review*: mọi TTS có **write ở mọi
+> repo** (để cộng tác cross-quadrant, vd adapter #29 AIE-1+AIE-2 cùng đụng `apps/studio`), nhưng `main`
+> được **GitHub bảo vệ server-side** (PR + ≥1 review + **CODEOWNERS** bắt owner domain duyệt). CODEOWNERS
+> đã được **khôi phục** — xem §2.
 
 ---
 
 ## 1. Bản đồ repo (8 repo: 1 cha + 7 con)
 
-| Path trong workspace | Repo GitHub (private) | Owner (write) | Nội dung |
+| Path trong workspace | Repo GitHub (public) | Owner (CODEOWNERS review) | Nội dung |
 |---|---|---|---|
 | **(gốc)** `agentcore-studio-kit` | `hieubui2409/agentcore-studio-kit` | **mentor** | Repo CHA = workspace root: `pyproject.toml` + `uv.lock` + `docker/` + `docker-compose*.yml` + `.github/` (CI + **reusable-workflow** + **composite action**) + `Makefile` + `conftest.py` + `tests/` + `scripts/` + `docs/` + `GITFLOWS.md` + `README.md`. Ghim con trỏ 7 submodule. |
 | `packages/contracts` | `agentcore-studio-contracts` | **mentor** (đổi cần mentor duyệt) | `studio_contracts` — hợp đồng chung (Recipe/TraceEvent/Scorecard/NodeType/Protocol). Ai cũng phụ thuộc → đổi = mentor duyệt. |
@@ -40,20 +43,29 @@ agentcore-studio-kit  (repo CHA — mentor)
 
 ## 2. Phân quyền (mentor set 1 lần trên GitHub)
 
-**Nguyên tắc:** mỗi kỹ sư có **write** ở đúng repo domain mình, **read** ở phần còn lại. Đây là
-ranh giới CỨNG — không có token = không push được, không phải chỉ chặn ở review.
+**Nguyên tắc (từ 2026-07-24 — repos PUBLIC):** mọi TTS có **write ở TẤT CẢ repo** (để cộng tác
+cross-quadrant). Ownership **không** còn ở tầng git-push nữa mà ở tầng **review**: `main` mỗi repo bật
+**branch-protection + CODEOWNERS** (server-side, không lách được). Merge vào repo domain nào **bắt buộc
+owner domain đó (hoặc mentor) duyệt**. Không tự push `main`; không tự-approve PR repo mình own.
 
-| Người | Repo có **WRITE** | Repo chỉ **READ** |
+| Repo | Owner (CODEOWNERS — bắt buộc duyệt merge) | Write (push nhánh) |
 |---|---|---|
-| **DE — Nguyễn Đông Anh** | `agentcore-studio-kb` | cha, contracts, app, engine, workbench, evalhub |
-| **AIE-1 — Trần Bá Đạt** | `agentcore-studio-engine` | cha, contracts, app, kb, workbench, evalhub |
-| **SWE — Thiệu Quang Minh** | `agentcore-studio-workbench` **+ `agentcore-studio-web`** | cha, contracts, app, kb, engine, evalhub |
-| **AIE-2 — Lưu Tiến Duy** | `agentcore-studio-evalhub` | cha, contracts, app, kb, engine, workbench |
-| **mentor** | **tất cả** (admin) | — |
-| _web (SWE — Thiệu Quang Minh)_ | `agentcore-studio-web` | mentor giữ **ownership**; SWE có `push` (mở rộng canvas ở sprint sau) |
+| `agentcore-studio-kb` | **DE — Nguyễn Đông Anh** (`@DongAnh2704`) + mentor | cả 4 TTS + mentor |
+| `agentcore-studio-engine` | **AIE-1 — Trần Bá Đạt** (`@TranBaDat2607`) + mentor | cả 4 TTS + mentor |
+| `agentcore-studio-workbench` | **SWE — Thiệu Quang Minh** (`@Dozyboy`) + mentor | cả 4 TTS + mentor |
+| `agentcore-studio-web` | **SWE — Thiệu Quang Minh** (`@Dozyboy`) + mentor | cả 4 TTS + mentor |
+| `agentcore-studio-evalhub` | **AIE-2 — Lưu Tiến Duy** (`@dholmes0207`) + mentor | cả 4 TTS + mentor |
+| `agentcore-studio-app` | **mentor** (composition root) | cả 4 TTS + mentor |
+| `agentcore-studio-contracts` | **mentor** (seam chung — D-12) | cả 4 TTS + mentor |
+| `agentcore-studio-kit` (cha) | **mentor** (bump pointer) | cả 4 TTS + mentor |
 
-**Contracts (mentor-approval):** không cấp write cho kỹ sư OJT. Đổi contract → mở PR ở
-`agentcore-studio-contracts`, cần **mentor** approve (đây là seam chung, đổi bừa là vỡ cả 4 người).
+> **CODEOWNERS thật sự chặn:** vì repo đã public, `require_code_owner_reviews=true` enforce ở GitHub —
+> PR vào `kb` không merge được cho tới khi `@DongAnh2704` (hoặc mentor) approve. TTS tác giả **không**
+> tự-approve PR của mình → cross-check luôn có 2 mắt.
+
+**Contracts (mentor-approval, D-12):** ai cũng push nhánh được, nhưng CODEOWNERS `contracts` = **mentor**
+→ đổi contract bắt buộc mentor duyệt (seam chung, đổi bừa vỡ cả 4 domain; rename/required-add = bump
+`SCHEMA_VERSION` + mini-RFC 4 chữ ký).
 
 ### Secret cho CI (mentor set 1 lần, xem §9)
 
@@ -140,12 +152,12 @@ gh pr create --fill --base main     # BẮT BUỘC: main chỉ vào qua PR
 → **Sau khi PR merge, xong phần việc của bạn.** Bạn KHÔNG cần đụng repo cha. Đồng đội `git submodule
 update --remote packages/kb` là thấy code bạn.
 
-> **Vì sao PR chứ không `git push` thẳng main?** Harness cài ở repo bạn liệt `main` là **protected
-> branch** (`harness/data/protected-branches.yaml`); pre-push `protected_ref_guard` **chặn** push
-> thẳng vào `main` — nó đòi artifact merge-grade y như một PR đã review. Trên GitHub private-free,
-> branch-protection/CODEOWNERS-hard-gate bị khoá (xem đầu tài liệu §intro), nên **harness-guard chính
-> là lớp thay thế**: kỷ luật "vào main chỉ qua PR" do guard enforce ở tầng local, không phải GitHub.
-> Đó là lý do luồng trên đi nhánh + `gh pr create` thay vì `git push` vào main.
+> **Vì sao PR chứ không `git push` thẳng main?** `main` mỗi repo đã bật **GitHub branch-protection
+> THẬT** (repos public từ 2026-07-24): bắt **PR + ≥1 review + CODEOWNERS** (owner domain duyệt), cấm
+> push thẳng/force-push/xóa branch — enforce **server-side**, không thể lách. Local
+> `protected_ref_guard` (`harness/data/protected-branches.yaml`) vẫn chạy như **lớp phòng-thủ-sâu thứ
+> hai** ở máy bạn, nhưng giờ không còn là lớp *duy nhất* như hồi private-free. Đó là lý do luồng trên
+> đi nhánh + `gh pr create` thay vì `git push` vào main.
 
 ### Chạy test (cần CẢ workspace)
 
