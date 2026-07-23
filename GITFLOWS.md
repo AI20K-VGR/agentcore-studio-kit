@@ -18,7 +18,7 @@ lỗi submodule đến từ đó.
 
 | Path trong workspace | Repo GitHub (public) | Owner (CODEOWNERS review) | Nội dung |
 |---|---|---|---|
-| **(gốc)** `agentcore-studio-kit` | `hieubui2409/agentcore-studio-kit` | **mentor** | Repo CHA = workspace root: `pyproject.toml` + `uv.lock` + `docker/` + `docker-compose*.yml` + `.github/` (CI + **reusable-workflow** + **composite action**) + `Makefile` + `conftest.py` + `tests/` + `scripts/` + `docs/` + `GITFLOWS.md` + `README.md`. Ghim con trỏ 7 submodule. |
+| **(gốc)** `agentcore-studio-kit` | `AI20K-VGR/agentcore-studio-kit` | **mentor** | Repo CHA = workspace root: `pyproject.toml` + `uv.lock` + `docker/` + `docker-compose*.yml` + `.github/` (CI + **reusable-workflow** + **composite action**) + `Makefile` + `conftest.py` + `tests/` + `scripts/` + `docs/` + `GITFLOWS.md` + `README.md`. Ghim con trỏ 7 submodule. |
 | `packages/contracts` | `agentcore-studio-contracts` | **mentor** (đổi cần mentor duyệt) | `studio_contracts` — hợp đồng chung (Recipe/TraceEvent/Scorecard/NodeType/Protocol). Ai cũng phụ thuộc → đổi = mentor duyệt. |
 | `apps/studio` | `agentcore-studio-app` | **mentor** | `studio_app` — composition root: DB pool-split, RLS fence wiring, middleware, providers, obs, queue. |
 | `packages/kb` | `agentcore-studio-kb` | **DE — Nguyễn Đông Anh** | `studio_kb` — KB pipeline + `kb.search` fence-DATA + `kb.chunks` RLS. |
@@ -74,12 +74,12 @@ cần **1 fine-grained PAT read-only**. `web` KHÔNG cần (standalone).
 
 ```bash
 # 1. Tạo fine-grained PAT: GitHub → Settings → Developer settings → Fine-grained tokens
-#    - Resource owner: hieubui2409
+#    - Resource owner: AI20K-VGR (org; repos đã transfer 2026-07-20)
 #    - Repository access: 7 repo studio (cha + contracts/kb/engine/workbench/evalhub/app) — KHÔNG cần web
 #    - Permissions: Contents = Read-only ; Expiration: 90 ngày (nhớ rotate)
 # 2. Set secret cho 7 repo (tài khoản user không có org-secret dùng chung → set từng repo):
 for r in kit contracts kb engine workbench evalhub app; do
-  echo "$PAT" | gh secret set PAT --repo hieubui2409/agentcore-studio-$r
+  echo "$PAT" | gh secret set PAT --repo AI20K-VGR/agentcore-studio-$r
 done
 ```
 
@@ -87,13 +87,13 @@ done
 
 ```bash
 # ví dụ cấp cho DE (Nguyễn Đông Anh, username GitHub "DongAnh2704") quyền push vào repo kb
-gh api -X PUT repos/hieubui2409/agentcore-studio-kb/collaborators/DongAnh2704 \
+gh api -X PUT repos/AI20K-VGR/agentcore-studio-kb/collaborators/DongAnh2704 \
   -f permission=push        # push = read+write; các mức: pull|triage|push|maintain|admin
 
 # read-only ở các repo khác:
-gh api -X PUT repos/hieubui2409/agentcore-studio-contracts/collaborators/DongAnh2704 -f permission=pull
-gh api -X PUT repos/hieubui2409/agentcore-studio-app/collaborators/DongAnh2704       -f permission=pull
-gh api -X PUT repos/hieubui2409/agentcore-studio-kit/collaborators/DongAnh2704       -f permission=pull
+gh api -X PUT repos/AI20K-VGR/agentcore-studio-contracts/collaborators/DongAnh2704 -f permission=pull
+gh api -X PUT repos/AI20K-VGR/agentcore-studio-app/collaborators/DongAnh2704       -f permission=pull
+gh api -X PUT repos/AI20K-VGR/agentcore-studio-kit/collaborators/DongAnh2704       -f permission=pull
 ```
 Làm tương tự cho AIE-1 (Trần Bá Đạt · `TranBaDat2607`)→engine, SWE (Thiệu Quang Minh · `Dozyboy`)→workbench **+ web**,
 AIE-2 (Lưu Tiến Duy · `dholmes0207`)→evalhub. (Hoặc dùng UI: repo → Settings → Collaborators → Add people.)
@@ -109,7 +109,7 @@ Bảng username đầy đủ: `agentcore-studio/03-role-tracks/team-roster.md`.
 Submodule **KHÔNG tự tải** khi `git clone` thường. Phải `--recursive`:
 
 ```bash
-git clone --recursive git@github.com:hieubui2409/agentcore-studio-kit.git
+git clone --recursive git@github.com:AI20K-VGR/agentcore-studio-kit.git
 cd agentcore-studio-kit
 
 # nếu lỡ clone quên --recursive:
@@ -260,7 +260,7 @@ agentcore-studio-kit (cha)
 └─ .github/workflows/ci.yml                    ← CI workspace của cha (lint/test-matrix/leak/build)
 
 6 repo Python con  →  .github/workflows/ci.yml = STUB ~13 dòng:
-    uses: hieubui2409/agentcore-studio-kit/.github/workflows/reusable-domain-ci.yml@main
+    uses: AI20K-VGR/agentcore-studio-kit/.github/workflows/reusable-domain-ci.yml@main
     with: { domain_path, domain_package }
     secrets: inherit
 
@@ -270,7 +270,7 @@ agentcore-studio-web  →  CI STANDALONE (pnpm install + build). KHÔNG dùng re
 - **Sửa quy trình CI của domain** (bước test, DB, token…) → chỉ sửa `reusable-domain-ci.yml` ở repo
   cha; cả 6 repo con ăn theo (`@main`). Không đụng từng repo con.
 - Để repo con (private) gọi được reusable workflow của repo cha (private) cùng chủ: mentor đã bật
-  `Actions access = user` cho repo cha (`gh api -X PUT repos/hieubui2409/agentcore-studio-kit/actions/permissions/access -f access_level=user`).
+  `Actions access = user` cho repo cha (`gh api -X PUT repos/AI20K-VGR/agentcore-studio-kit/actions/permissions/access -f access_level=user`).
 
 ### 9.2. Phương án B chạy thế nào (repo con)
 
