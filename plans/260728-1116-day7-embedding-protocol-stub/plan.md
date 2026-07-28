@@ -1,7 +1,7 @@
 ---
 id: 260728-1116-day7-embedding-protocol-stub
 title: "Day 7 AIE-1 - EmbeddingService Protocol + StubEmbedding (fixtures-first)"
-status: in_progress
+status: completed
 mode: fast
 tdd: true
 branch: day7/embedding-protocol-stub
