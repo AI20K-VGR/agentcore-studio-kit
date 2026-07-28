@@ -1,0 +1,33 @@
+verdict: PASS
+reviewer: user:tranbadat26072004@gmail.com
+role: hs:code-reviewer
+rationale: 'No Critical or blocking finding survived scrutiny on 959c6c9..56e7626.
+  Import-layering constraint honored (grep: studio_kb appears only in docstrings/comments;
+  lint-imports ''AgentCore Studio quadrant layering KEPT'', 1 kept 0 broken). No regression
+  to existing call sites: build_prompt gained an optional 3rd arg (all 2-arg call
+  sites byte-identical), and every LLM.complete impl/double in the workspace already
+  accepts **kwargs so the new kwargs[''model''] cannot TypeError. Prompt-injection
+  via agent_config.instructions cannot forge citations - LlmStepExecutor still filters
+  _CITATION_RE hits against retrieved_ids. instructions is only sha256-hashed into
+  TraceEvent.inputs_hash, never stored raw, so no new data exposure. Two Important
+  findings from the first pass were fixed in a follow-up commit (95bea48), not merely
+  noted: (1) test_build_prompt_without_instructions_is_unchanged was tautological
+  (compared build_prompt against itself; passed even with the guard deleted) - replaced
+  with two tests pinning the literal header/instructions ordering; (2) StubEmbedding.embed
+  ignored len(texts) and always returned the fixture''s fixed 2 vectors, diverging
+  from the EmbeddingService len(out)==len(in) invariant (FakeEmbedding honors it) -
+  fixed to cycle the recorded vectors to len(texts), with a new swap-proof test exercising
+  the "no interpreter.py change on embedding swap" claim. Re-verified post-fix: pytest
+  packages/engine/tests 62 passed, ruff clean, mypy --strict 16 files clean, lint-imports
+  clean. Remaining non-blocking suggestions (not fixed, judged out of scope): (3)
+  case_id concatenated into a fixture path with no traversal guard - mirrors the
+  pre-existing FixtureLLM pattern, not reachable from untrusted input today; (4) interpreter.py
+  unconditionally overwrites node.params["model"] from agent_config while executors.py
+  lets a recipe-declared kwargs["model"] win - harmless today (no recipe declares
+  params["model"]) but worth a clarifying comment if picked up later.'
+effort: low
+strategy: single-pass in-subagent review of packages/engine 56e7626 (959c6c9..HEAD),
+  findings applied in follow-up commit 95bea48, re-verified post-fix; ran pytest (60
+  then 62 passed) + ruff + mypy --strict + lint-imports; grep-verified no studio_kb
+  import
+run_seq: null
