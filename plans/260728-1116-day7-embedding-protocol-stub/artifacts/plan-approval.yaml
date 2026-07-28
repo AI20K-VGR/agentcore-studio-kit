@@ -1,0 +1,16 @@
+schema: plan-approval/v1
+plan: 260728-1116-day7-embedding-protocol-stub
+plan_hash: 38b574a87e2b
+file_hashes:
+  plan.md: 204c773cbea5
+  phase-1-main.md: 197063afe441
+  plan-graph.yaml: 2f04113bcaca
+author: user:tranbadat26072004@gmail.com
+reviewer: user:tranbadat26072004@gmail.com
+verdict: APPROVED
+rationale: 'Re-approve after fixing plan-graph.yaml''s post: artifact filename (review-decision.json
+  -> review-decision.yaml, matching write_review_decision.py''s actual canonical output)
+  — no scope change, just correcting my own authoring typo so derive_plan_completion
+  can resolve the phase.'
+ts: '2026-07-28T04:47:22.208500+00:00'
+run_seq: null

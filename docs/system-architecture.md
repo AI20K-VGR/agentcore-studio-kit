@@ -244,7 +244,7 @@ thân hàm):
 | Protocol | File | Impl WIRED | Impl ĐỂ TRỐNG (spec owner) |
 |---|---|---|---|
 | `LLM` | `protocols.py` | `providers/gemini.py::GeminiProvider` (chỉ `complete`, opt-in qua `STUDIO_USE_FAKE_PROVIDERS=false`+key) + `providers/fakes.py::FakeLLM` (CI-fixture, hash-seeded deterministic) | — |
-| `EmbeddingService` | `protocols.py` | `providers/fakes.py::FakeEmbedding` (**CHỈ CI-fixture** — docstring ghi rõ "KHÔNG phải deliverable AIE-1") | Concrete 2-impl (stub-local + gateway) — deliverable graded AIE-1, **không ship trong kit** |
+| `EmbeddingService` | `protocols.py` | `providers/fakes.py::FakeEmbedding` (**CHỈ CI-fixture** — docstring ghi rõ "KHÔNG phải deliverable AIE-1") | Concrete 2-impl (stub-local + gateway) — deliverable graded AIE-1; **stub-local đã ship** (`packages/engine/src/studio_engine/demo_stubs.py::StubEmbedding`, VCR-fixture `packages/engine/tests/fixtures/embedding/`), **gateway impl vẫn không ship trong kit** |
 | `TraceWriter` | `protocols.py` | `obs/trace_writer.py::PgTraceWriter` (1 INSERT thuần vào `obs.trace_events`, cấm cost-aggregation/dedup trong `write()`) | — |
 | `KbSearch` | `kb.py` | — (chỉ seam) | `packages/kb/search.py::KbSearchService.search` — thân `raise NotImplementedError` (spec DE) |
 

@@ -1,0 +1,12 @@
+edges: []
+subtasks:
+  P1:
+    files_to_create:
+      - packages/engine/tests/fixtures/embedding/smoke-01.json
+      - packages/engine/tests/test_stub_embedding.py
+    files_to_modify:
+      - packages/engine/src/studio_engine/demo_stubs.py
+      - packages/engine/src/studio_engine/executors.py
+      - packages/engine/src/studio_engine/interpreter.py
+      - packages/engine/tests/test_llm_step_prompt_build.py
+    post: [verification-P1.json, review-decision.yaml]
