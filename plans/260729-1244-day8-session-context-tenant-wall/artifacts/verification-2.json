@@ -1,0 +1,36 @@
+{
+  "stage": "cook",
+  "plan": "260729-1244-day8-session-context-tenant-wall",
+  "checks": [
+    {
+      "name": "unit",
+      "status": "PASS",
+      "detail": "pytest packages/engine/tests -q: 68 passed (66 post-Phase-1 + 2 new fail-closed tests in test_executors_behavior.py). RED confirmed before implementation: both new tests genuinely failed with 'DID NOT RAISE PermissionError' prior to executors.py changes."
+    },
+    {
+      "name": "ruff",
+      "status": "PASS",
+      "detail": "uv run ruff check packages/engine: All checks passed"
+    },
+    {
+      "name": "mypy_strict",
+      "status": "PASS",
+      "detail": "uv run mypy --strict packages/engine: Success, no issues found in 18 source files"
+    },
+    {
+      "name": "lint_imports",
+      "status": "PASS",
+      "detail": "uv run lint-imports: AgentCore Studio quadrant layering KEPT — 1 kept, 0 broken"
+    }
+  ],
+  "verdict": "PASS",
+  "phase": "2",
+  "actor": "user:tranbadat26072004@gmail.com",
+  "ts": "2026-07-29T13:40:00+00:00",
+  "acceptance_evidence": {
+    "missing_tenant_raises": "test_kb_retrieve_raises_when_tenant_id_absent — PermissionError, not []",
+    "slug_tenant_raises": "test_kb_retrieve_raises_when_tenant_id_is_slug_not_uuid — PermissionError for a non-UUID tenant_id",
+    "sentinel_removed": "grep -rn \"_NO_TENANT_ID\" packages/ -> no source matches (only gitignored .mypy_cache/__pycache__ binaries)",
+    "normal_path_unchanged": "test_kb_retrieve_returns_empty_stub (pre-existing, explicit tenant_id=ANKOR_ID) unmodified and still green"
+  }
+}
