@@ -113,6 +113,24 @@ và `studio_app` KHÔNG có `py.typed` trong cây hiện tại.
 Fence chống rò rỉ chéo-tenant trên `kb.chunks` dựng từ **4 lớp cơ chế phối hợp**, không lớp nào một
 mình là đủ (docstring `packages/kb/src/studio_kb/schema.py:1-14` giải thích trực tiếp):
 
+> **Lớp engine (Day 8, INV-1)** — 4 lớp dưới đây là fence ở tầng data-plane. Trên chúng còn một lớp
+> nữa ở tầng interpreter: `interpreter.run()` nhận `session_context: SessionContext` **keyword-only,
+> bắt buộc, không default** (§6), và mọi danh tính tenant nó phát ra — `tenant_id` bơm xuống node
+> `kb-retrieve`, `tenant_id` của mọi `TraceEvent` — đều lấy từ `session_context.tenant_id`, **không
+> bao giờ** từ `recipe.tenant_id` do client khai (`grep "recipe.tenant_id" interpreter.py` → rỗng).
+> Lệch tenant (recipe khai một đằng, session resolve một nẻo) **không phải lỗi**: run vẫn chạy, chỉ
+> bị thu hẹp về tenant của session. Thứ tự dict-spread ở `interpreter.py:241` là dòng load-bearing —
+> `session_context.tenant_id` đặt SAU `**node.params` nên một `tenant_id` client tự nhét sẵn vào
+> node luôn bị ghi đè. Dưới nữa, `KbRetrieveExecutor` fail-closed: thiếu hoặc sai kiểu `tenant_id`
+> thì **raise `PermissionError`** chứ không rơi về sentinel (`executors.py:141-149`) — bản trước
+> dùng `UUID(int=0)`, fail-closed **do may** (tình cờ khớp 0 dòng) chứ không do hợp đồng, và một lỗi
+> wiring nằm sau nó đọc y hệt "tenant này không có chunk". Đây là defense-in-depth: dispatch bình
+> thường qua `run()` không bao giờ chạm nhánh raise đó.
+>
+> Giới hạn còn lại, ghi để không ai tưởng dây đã kín: `apps/studio/middleware.py:51-52` vẫn tin
+> header `x-tenant-id` client gửi và tự nhận trong comment là "DEV-TIME STUB — NOT production-grade".
+> Fence kín ở tầng engine trở xuống; mắt xích yếu nhất hiện nằm ở middleware (SWE).
+
 ### 4.1. Hai role Postgres (`docker/postgres-init/00-roles.sql`)
 
 - `studio_owner` — `NOSUPERUSER NOCREATEDB NOCREATEROLE`, **owner của mọi schema/table** kit này tạo
@@ -252,6 +270,17 @@ Composition (`apps/studio`) là nơi duy nhất inject concrete impl vào Protoc
 không bao giờ import concrete class của package khác (chỉ `studio_contracts`). Không dùng DI-framework
 (không container 3-tầng như AgentSpace anti-pattern) — **direct composition thuần** tại `app.py`/
 providers selector.
+
+**Protocol thứ 5, cố ý KHÔNG khai ở `contracts`** — `SessionContext`
+(`packages/engine/src/studio_engine/session.py`, Day 8, INV-1). Đây là danh tính caller do server
+resolve mà `interpreter.run()` bắt buộc phải nhận. Nó khai trong `studio_engine` chứ không phải
+`studio_contracts`, và cũng **không** tái dùng `studio_workbench.tenant_wall.ResolvedContext` của
+SWE — vì layers-contract xếp `studio_engine` và `studio_workbench` **cùng một tầng sibling**, cấm
+import lẫn nhau (§2). Structural typing gỡ nút này: `ResolvedContext` thoả `SessionContext` sẵn mà
+không cần adapter hay cross-import, composition root (`apps/studio` — tầng duy nhất được import cả
+hai quadrant) truyền thẳng object qua. 3 thành viên khai bằng `@property` read-only để một
+`@dataclass(frozen=True)` thoả Protocol dưới `mypy --strict` (Protocol khai attribute thường sẽ loại
+frozen dataclass vì variance mismatch).
 
 Danh sách đầy đủ seam ĐỂ TRỐNG khác (không phải Protocol từ contracts, nhưng cùng nguyên tắc
 "thân `NotImplementedError` = spec"):
