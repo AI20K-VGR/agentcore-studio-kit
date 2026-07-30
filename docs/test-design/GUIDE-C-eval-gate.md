@@ -13,7 +13,7 @@ Grid C is a specification written ahead of the code. Grid F is a specification o
 Both are graded. Do not treat the second as a substitute for the first.
 
 > All `file:line` citations are against the pinned baseline named in `02-MATRIX.md` §6
-> (kit `88ad722`, `packages/evalhub` `123e85c4`, `packages/contracts` `3d7004b2`). Verified by reading
+> (kit `8a420e7`, `packages/evalhub` `123e85c4`, `packages/contracts` `3d7004b2`). Verified by reading
 > those files at those SHAs. Measured numbers in this guide come from
 > `.venv/bin/python -m pytest packages/evalhub/tests -q -p no:cacheprovider -rsxX`, which on the pinned
 > tree gives `38 passed, 1 skipped, 1 xfailed, 1 xpassed in 0.22s`.

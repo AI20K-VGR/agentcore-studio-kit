@@ -210,15 +210,39 @@ numbers drifting away from the axes they were supposed to describe.
 
 ---
 
-## 7. Which tree this describes
+## 7. Which tree this describes — baseline lock-in
 
-Every `file:line` in these guides was verified against exactly this baseline. Check yours matches before you
-conclude a citation is wrong:
+**Locked 2026-07-30 15:12 (+07) · kit `8a420e71707e14084d3f3079a47d2b32d71d78f1`**
+
+Every `file:line` in these guides was verified against exactly this baseline.
+
+**The baseline names a state of the CODE, not a value of `HEAD`.** Documentation commits land on top of it
+constantly — this very file is one — and none of them moves it. So do not compare `HEAD`; compare the code:
 
 ```bash
-git rev-parse HEAD          # 88ad7224523cc70fb0bfe6c0ddc0259a2bd51387
+# Has any Python or any submodule pointer moved since the baseline?
+git diff --name-only 8a420e7 HEAD -- '*.py'
+git diff 8a420e7 HEAD --submodule=short | grep '^[-+]Subproject'
 git submodule status
 ```
+
+Both empty ⇒ the citations in these guides still describe your tree exactly, whatever `HEAD` says. Non-empty
+⇒ citations touching those files may have drifted; check by symbol name first, and report it if the guide is
+genuinely wrong.
+
+> **Re-locked once, and the re-lock cost nothing.** The first lock was `88ad722`. `main` then moved six
+> commits while this set was being written. Before moving the label I checked what had actually changed:
+>
+> ```
+> git diff --name-only 88ad722 8a420e7 -- '*.py'   ->  0 files
+> git diff 88ad722 8a420e7 --submodule=short       ->  0 pointer moves
+> ```
+>
+> Zero Python files changed and no submodule pointer moved — the six commits were documentation and plan
+> artifacts. So **every citation in this set still holds**, and the new SHA is a newer label on the same code.
+>
+> That check is the point, not the result. Moving a baseline label without it would be claiming the citations
+> were verified against a tree nobody verified them against.
 
 | Submodule | SHA |
 |---|---|

@@ -7,7 +7,7 @@ a **refusal, not a fabrication**. It is the smallest grid in the set — 3 live 
 work is in the mutant cells (§8), not in the rows. That shape is deliberate and §1 explains why.
 
 Every `file:line` below was verified against the pinned baseline (`02-MATRIX.md` §6 names the pinned SHAs:
-kit `88ad722`, `packages/engine` `a65c9d69`, `packages/contracts` `3d7004b2`). Every kill count in §8 was
+kit `8a420e7`, `packages/engine` `a65c9d69`, `packages/contracts` `3d7004b2`). Every kill count in §8 was
 **re-measured for this guide**, not copied — each mutant was planted, the whole kit suite run, then reverted
 (`git status` clean after each). Where a re-measurement disagrees with the round-2 deep dive, this guide
 carries the new number and says so.
