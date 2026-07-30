@@ -66,7 +66,7 @@ from studio_evalhub.golden_case import GoldenCase, GoldenSet
 from studio_evalhub.harness import EvalHarness, SmokeResult, _retrieved_citations
 from studio_kb.doc_factory import TENANT_IDS
 from studio_kb.static_search import StaticKbSearch
-from studio_workbench.builder_d6 import create_recipe_d6
+from studio_workbench import create_recipe_d6
 
 _ROOT = Path(__file__).resolve().parent.parent
 _GOLDEN = _ROOT / "packages" / "kb" / "golden" / "smoke-10.yaml"
