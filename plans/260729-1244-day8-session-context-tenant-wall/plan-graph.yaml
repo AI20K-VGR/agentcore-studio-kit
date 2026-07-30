@@ -1,0 +1,25 @@
+plan: 260729-1244-day8-session-context-tenant-wall
+edges:
+  - {from: "1", to: "2"}
+subtasks:
+  "1":
+    files_to_create:
+      - packages/engine/src/studio_engine/session.py
+      - packages/engine/tests/test_session_context_tenant_wall.py
+    files_to_modify:
+      - packages/engine/src/studio_engine/interpreter.py
+      - packages/engine/src/studio_engine/__init__.py
+      - packages/engine/src/studio_engine/__main__.py
+      - packages/engine/tests/test_cli_demo.py
+      - packages/engine/tests/test_dag_edge_walk.py
+      - packages/engine/tests/test_interpreter_behavior.py
+      - packages/engine/tests/test_kb_retrieve_llm_step_threading.py
+      - packages/engine/tests/test_llm_step_prompt_build.py
+      - packages/engine/tests/test_refusal_from_grounding.py
+      - packages/engine/tests/test_trace_event_emission.py
+    post: ["verification-1.json"]
+  "2":
+    files_to_modify:
+      - packages/engine/src/studio_engine/executors.py
+      - packages/engine/tests/test_executors_behavior.py
+    post: ["verification-2.json", "review-decision.yaml"]

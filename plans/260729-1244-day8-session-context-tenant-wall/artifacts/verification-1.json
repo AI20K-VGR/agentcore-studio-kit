@@ -1,0 +1,37 @@
+{
+  "stage": "cook",
+  "plan": "260729-1244-day8-session-context-tenant-wall",
+  "checks": [
+    {
+      "name": "unit",
+      "status": "PASS",
+      "detail": "pytest packages/engine/tests -q: 69 passed final (62 baseline + 4 new in test_session_context_tenant_wall.py, +1 more test_node_params_tenant_id_is_overwritten_not_merely_supplemented added in review-fix commit 24f7b85). RED confirmed before implementation: 3/4 original new tests genuinely failed (TypeError: unexpected keyword argument 'session_context' / AssertionError) prior to interpreter.py changes; the review-added test was mutation-killed by hand (reversed merge order -> AssertionError, reverted)."
+    },
+    {
+      "name": "ruff",
+      "status": "PASS",
+      "detail": "uv run ruff check packages/engine: All checks passed (after --fix for import ordering)"
+    },
+    {
+      "name": "mypy_strict",
+      "status": "PASS",
+      "detail": "uv run mypy --strict packages/engine: Success, no issues found in 18 source files. Probe confirmed: SessionContext declared with @property members satisfies a frozen(slots=True) dataclass without adapter (test_frozen_dataclass_satisfies_session_context_protocol)."
+    },
+    {
+      "name": "lint_imports",
+      "status": "PASS",
+      "detail": "uv run lint-imports: AgentCore Studio quadrant layering KEPT — 1 kept, 0 broken. session.py declared inside studio_engine, no studio_workbench import."
+    }
+  ],
+  "verdict": "PASS",
+  "phase": "1",
+  "actor": "user:tranbadat26072004@gmail.com",
+  "ts": "2026-07-29T13:20:00+00:00",
+  "acceptance_evidence": {
+    "money_shot_session_over_recipe": "test_kb_search_receives_session_tenant_not_recipe_tenant — recipe.tenant_id=BOREA_ID, session.tenant_id=ANKOR_ID; KbSearch.search() asserted == ANKOR_ID and != BOREA_ID",
+    "trace_event_tenant_from_session": "test_trace_event_tenant_id_comes_from_session — every TraceEvent in a 2-node run carries tenant_id == ANKOR_ID, none BOREA_ID",
+    "recipe_tenant_id_grep_empty": "grep -n \"recipe.tenant_id\" packages/engine/src/studio_engine/interpreter.py -> no matches (exit 1)",
+    "run_requires_session_context": "test_run_requires_session_context — omitting session_context raises TypeError",
+    "session_docstring_dod": "session.py module docstring contains tag-vs-isolation section + fake-fence (\"nhờ LLM đừng nói\") explanation, cross-referencing executors.py:100-106 and trace.py:30"
+  }
+}

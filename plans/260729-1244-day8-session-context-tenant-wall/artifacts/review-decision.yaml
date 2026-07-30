@@ -1,0 +1,100 @@
+verdict: PASS_WITH_RISK
+reviewer: user:tranbadat26072004@gmail.com
+role: hs:code-reviewer
+rationale: 'Fence INV-1 dựng đúng và có bằng chứng chạy thật trên a65c9d6..c536c12
+  (53566fe, c536c12). Gate xanh toàn bộ: pytest packages/engine/tests 68 passed; ruff
+  All checks passed; mypy --strict src+tests Success 18 files; lint-imports "AgentCore
+  Studio quadrant layering KEPT", 1 kept 0 broken. Acceptance cơ học đạt: grep "recipe.tenant_id"
+  trong interpreter.py rỗng (rc=1); _NO_TENANT_ID biến mất khỏi source (chỉ còn trong
+  .pyc cũ). Đường threading kín: interpreter.py:237 ghi đè bằng {**node.params, "tenant_id":
+  session_context.tenant_id} (session đứng SAU nên khoá do recipe khai không thể thắng),
+  interpreter.py:289 lấy TraceEvent.tenant_id từ session; KB_RETRIEVE là node type
+  duy nhất tiêu thụ tenant identity nên không sót nhánh. Test money-shot có răng thật:
+  _TenantCapturingKbSearch ghi lại giá trị TỚI ĐƯỢC ranh giới KbSearch.search (không
+  assert lại chính input), assert cả 2 mặt (== ANKOR và != BOREA), test trace lặp
+  qua MỌI event chứ không chỉ event đầu. Protocol shape đúng: 3 thành viên khai @property
+  read-only nên frozen dataclass thoả mypy --strict (risk M của plan không hiện thực
+  hoá). PASS_WITH_RISK vì 4 rủi ro tồn dư, không cái nào là defect của hành vi đã
+  ship. (1) [Important] Dòng load-bearing duy nhất của fence KHÔNG có test: không
+  test nào ở engine gọi interpreter.run() với recipe mà node.params đã mang sẵn tenant_id
+  dạng UUID hợp lệ -- _kb_then_end_recipe dùng params={} (test_session_context_tenant_wall.py:97),
+  test_executors_behavior.py:54 gọi thẳng executor chứ không qua run(). Đảo thứ tự
+  dict-spread ở interpreter.py:237 vẫn để cả 68 test xanh. Đây đúng là kịch bản tấn
+  công sắc nhất còn lại (client khai UUID hợp lệ thay vì slug) vì nó lọt qua isinstance(...,
+  UUID) của executor. Fix rẻ: 1 test đặt params={"tenant_id": BOREA_ID}, assert search
+  nhận ANKOR. (2) [Important] Comment lạc hậu ngay trong range review: interpreter.py:231-235
+  vẫn viết "the executor falls back to its nil-UUID sentinel and KbSearch.search runs
+  against UUID(int=0) -> 0 chunks" -- hành vi đó đã bị c536c12 xoá; nay executor raise
+  PermissionError. Phase 2 cập nhật docstring executor nhưng bỏ sót comment này, khiến
+  người debug sự cố thiếu tenant sau này tìm nhầm triệu chứng "0 rows im lặng". (3)
+  [Important] Breaking change downstream đã verify, và danh sách file trong plan THIẾU:
+  chạy thật, 6 test workbench đỏ với TypeError run() missing 1 required keyword-only
+  argument ''session_context'' (test_builder.py::test_dynamic_recipe_wiring_to_interpreter,
+  test_wiring_d3, test_wiring_d4, test_wiring_d6 x2, test_wiring_d7); ngoài ra còn
+  call site thứ 7 plan không liệt kê: packages/kb/tests/test_spine_live.py:86 (hiện
+  8 skipped vì không có Postgres nên đỏ đang ẩn). Plan Risks-H chấp nhận break này
+  và bắt buộc mitigation "ghi rõ breaking-change + liệt kê file trong PR description
+  + comment issue #37/#38" -- mitigation chưa làm, và cả 2 commit message không có
+  footer BREAKING CHANGE. Điều kiện merge: liệt kê ĐỦ 7 call site, không phải 6. (4)
+  [Important, tồn dư từ trước, plan hoãn sang Sprint 3] section_roles vẫn là đường
+  client-khai đi thẳng vào KbSearch.search: executors.py:138/149/151 đọc node.params["section_roles"]
+  as-given, trong khi docstring của chính class đó (executors.py:89-94) tuyên bố "section_roles
+  MUST be resolved server-side ... a client-declared section_roles override must be
+  ignored ... exactly the T6 label-spoof this fence exists to stop". Day 8 vừa thêm
+  SessionContext.roles (đúng nguyên liệu để vá) nhưng chỉ thread tenant_id. Không
+  phải regression của diff này, nhưng docstring mới ở executors.py:123 ("tenant_id
+  is the one field this executor does NOT trust as-given") dễ bị đọc thành "các field
+  còn lại an toàn theo thiết kế". Cần 1 mục BACKLOG/issue tường minh thay vì để ngầm
+  trong docstring. Suggestion không chặn: (a) PermissionError nội suy giá trị thô
+  bị từ chối (executors.py:145) -- nội dung do caller điều khiển chảy vào log/err
+  body; dùng tên type hoặc cắt ngắn; không rò chéo tenant vì đó là giá trị của chính
+  caller. (b) Complexity-Delete: @runtime_checkable trên SessionContext chỉ phục vụ
+  đúng 1 assert isinstance, mà assert đó gần như rỗng nghĩa (runtime_checkable chỉ
+  kiểm sự tồn tại thuộc tính -- object có tenant_id kiểu str vẫn pass); chính plan
+  Risk-M dặn đừng dùng isinstance làm cổng validate, nên giữ decorator trên một Protocol
+  biên-bảo-mật là mời gọi lạm dụng về sau; mypy --strict + _accepts_session_context()
+  đã chứng minh đủ. (c) test_run_requires_session_context bắt TypeError trần bằng
+  try/except/return -- sẽ xanh với TypeError do bất kỳ kwarg nào khác thiếu; dùng
+  pytest.raises(TypeError, match="session_context"). (d) 7 file test import chéo default_session_context
+  từ test_session_context_tenant_wall dựa vào sys.path ngầm của pytest rootdir --
+  chạy được hôm nay (68 pass, không collect trùng) nhưng vỡ nếu đổi sang --import-mode=importlib
+  hoặc thêm tests/__init__.py; chỗ ở quy ước là conftest fixture hoặc tests/_helpers.py.
+  (e) SessionContext.roles trả list[str] mutable từ property read-only -- khi Sprint
+  3 thread roles vào fence, consumer có thể sửa tại chỗ danh sách quyền của caller;
+  Sequence[str] chặn kênh đó mà vẫn giữ structural match (chưa chạy mypy để xác nhận,
+  [ASSUMED]).'
+effort: low
+strategy: single-pass in-subagent review of packages/engine a65c9d6..c536c12 (53566fe,
+  c536c12); chay that pytest 68 passed + ruff + mypy --strict 18 files + lint-imports
+  1 kept 0 broken; grep-verified recipe.tenant_id gone from interpreter.py and _NO_TENANT_ID
+  gone from source; chay downstream packages/workbench/tests (6 failed, TypeError)
+  + packages/kb/tests/test_spine_live.py (8 skipped, call site :86 chua cap nhat)
+  de do breaking-change that thay vi suy dien
+run_seq: null
+addendum_verdict: PASS
+addendum: 'Follow-up fix commit 24f7b85 (main thread, not a fresh @code-reviewer
+  pass — low-token cook run, fix verified by re-derivation rather than a second
+  agent). Findings (1) and (2) fixed and re-verified: (1)
+  test_node_params_tenant_id_is_overwritten_not_merely_supplemented added, seeding
+  the kb-retrieve node''s OWN params["tenant_id"]=BOREA_ID alongside a
+  session of ANKOR_ID; mutation-killed by hand (temporarily reversed the
+  interpreter.py:241 merge order to {"tenant_id": session_context.tenant_id,
+  **node.params} — test failed with AssertionError BOREA != ANKOR as expected
+  — then reverted, confirmed via git diff the revert was clean). (2) the stale
+  nil-UUID-sentinel comment at interpreter.py:231-236 rewritten to describe
+  the actual current behavior (override + fail-closed PermissionError).
+  Also applied 2 of the non-blocking suggestions: (c) test_run_requires_session_context
+  now pytest.raises(TypeError, match="session_context") instead of bare
+  try/except; (a) PermissionError in executors.py no longer interpolates the
+  raw rejected tenant_id value, only its type name. Re-verified post-fix:
+  pytest packages/engine/tests 69 passed, ruff clean, mypy --strict 18 files
+  clean, lint-imports 1 kept 0 broken. Findings (3) and (4) NOT fixed, by
+  design: (3) the 7th breaking call site (packages/kb/tests/test_spine_live.py:86)
+  is in the DE-owned packages/kb repo, outside AIE-1''s WRITE scope for issue
+  #37 — flagged to the user for the PR description / issue #37 & #38 comments
+  (now 7 call sites, not 6, per the plan''s own required Risk-H mitigation).
+  (4) section_roles remaining client-declared is pre-existing behavior the
+  plan explicitly defers to Sprint 3 — flagged for a BACKLOG entry, not a
+  regression of this diff. Suggestions (b)/(d)/(e) left as-is (design
+  opinions / low-severity, judged not worth a second review round under the
+  user''s explicit low-token directive for this cook run).'
