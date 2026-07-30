@@ -126,6 +126,51 @@ python apps/studio/scripts/e2e_smoke_eval.py   # lần 2, so THÔNG/PASS/cit_acc
 
 ---
 
+## 5. Dữ liệu tại từng bước — cái gì, ở đâu
+
+Ví dụ thật lấy từ đúng lần chạy §1 ở trên, case `SC-01` (không bịa số):
+`run_id=c2ae813b…`, tenant `ankor` (`a0000000-0000…`), 3 chunk, citation `ankor-leave-001#c1`.
+
+| # | Bước | Ai giữ | Hàm | Dữ liệu VÀO | Dữ liệu RA (ví dụ thật SC-01) | Sống ở đâu |
+|---|---|---|---|---|---|---|
+| 1 | Form → Recipe | SWE | `create_recipe_d4(agent_id, tenant_id, scope, query)` | `query="Nhân viên xin nghỉ phép..."`, `tenant_id=UUID(ankor)`, `scope="t/public"` | `Recipe{agent_id, tenant_id, dag: 4 Node (n1 kb-retrieve → n2 llm-step → n3 tool-call → n4 end) qua 3 Edge, kb_binding, agent_config}` | in-memory (pydantic `Recipe`), chưa persist — recipe-store thật là nợ đã biết ở mục cuối |
+| 2 | Resolve identity | SWE (`tenant_wall.resolve_session`) | `resolve_session({tenant_id, user, roles})` | dict thô từ session/harness | `session_context` (tenant server-resolve) — **INV-1**: nếu `recipe.tenant_id` lệch với session, session thắng, không phải recipe | in-memory, tách biệt khỏi `Recipe.tenant_id` (đó chính là điểm engine#12 chốt) |
+| 3 | `kb-retrieve` (node n1) | AIE-1 gọi, DE trả | `interpreter.run()` → `kb_search.search(query, tenant_id **từ session**, section_roles, top_k=3)` | tenant từ session (không phải `node.params`/recipe) | `list[KbSearchResultItem]` — 3 item, mỗi item `{chunk_id: "ankor-leave-001#c1", text: "...", score: float, tenant_id, section_role: "public"}` | in-memory trong `RunState`; nguồn thật là `kb.chunks` (Postgres, `packages/kb/src/studio_kb/schema.py`) qua `StaticKbSearch` |
+| 4 | `llm-step` (node n2) | AIE-1 | `build_prompt(query, chunks)` → `llm.complete(prompt)` | prompt render `[chunk_id]\ntext` từ 3 chunk | `{answer: str, citations: ["ankor-leave-001#c1"], refused: False}` — citations ở đây là LLM **tự khai**, chưa phải số chấm điểm | in-memory, ghi vào `RunResult.final_state["n2"]` |
+| 5 | `tool-call`/`end` (n3, n4) | AIE-1 | stub dispatch + terminate | — | `{"tool": ..., "status": "stub-dispatched"}`, `{"terminated": True}` | `RunResult.final_state["n3"]`/`["n4"]` |
+| 6 | Mỗi node emit trace | AIE-1 phát, DE lưu | `trace_writer.write(TraceEvent)` sau MỖI node | `node_id, node_type, outputs, tokens, cost, citations` của node đó | 4 dòng `TraceEvent`, `run_id=c2ae813b…` chung cho cả 4, `ts` tăng dần µs, `inputs_hash=sha256(...)` | §1 demo: `_NoopTraceWriter` — chỉ giữ tạm trên `RunResult.events` (RAM, mất khi process thoát). §3 demo (Postgres thật): `PgTraceWriter` — `INSERT INTO obs.trace_events` (bảng thật, xem schema dưới) |
+| 7 | Đọc lại trace (chỉ leg §3) | DE | `PgTraceReader.read_run(run_id)` | `run_id` | 4 `TraceEvent` **đọc lại từ Postgres**, đúng thứ tự `ts`, báo thiếu nếu 0-gap vỡ | Postgres `obs.trace_events`, WHERE `run_id = ...` |
+| 8 | Adapter map | AIE-1+AIE-2 (`studio_app.eval_adapter`) | `EngineAgentRunner.run_case()` | `RunResult{final_state, events}` | `CaseRun{answer: AgentAnswer{answer, citations, refused}, events: list[TraceEvent]}` | in-memory, composition root (`studio_app`) — nơi duy nhất được import cả 4 quadrant |
+| 9 | Citations CHẤM ĐIỂM | AIE-2 | `citations_from_trace(case_run.events)` | 4 `TraceEvent` | `["ankor-leave-001#c1"]` — đọc lại từ **trace** (`event.citations`), KHÔNG phải `answer.citations` ở bước 4 (agent tự khai) | in-memory, tính lại mỗi lần chấm — đây chính là "1 nguồn số" |
+| 10 | Chấm điểm | AIE-2 | `score_case(case, answer, grounded_citations)` | `GoldenCase` (nhãn kỳ vọng) + citations bước 9 | `success=True, citation_accuracy=1.00` | in-memory; publish thật (`Scorecard`/`Gate`) là tầng ngoài script này |
+
+**Bảng `obs.trace_events` thật (leg §3, Postgres) — cột khớp `TraceEvent` từng trường:**
+
+```sql
+CREATE TABLE obs.trace_events (
+    event_id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    tenant_id UUID NOT NULL,      -- NOT NULL, INV-1: không node nào thiếu tenant
+    node_id TEXT NOT NULL,
+    node_type TEXT NOT NULL,
+    ts TEXT NOT NULL,             -- ISO8601, đơn điệu trong 1 run_id
+    inputs_hash TEXT NOT NULL,
+    outputs JSONB NOT NULL DEFAULT '{}'::jsonb,
+    tokens JSONB NOT NULL DEFAULT '{}'::jsonb,
+    cost NUMERIC NOT NULL DEFAULT 0,
+    citations JSONB               -- chỉ non-null ở node llm-step
+);
+```
+
+**Điểm hay bị hiểu nhầm — 2 nơi "citations" khác nhau, KHÔNG phải 1 số:**
+`answer.citations` (bước 4, LLM tự khai trong `final_state`) và `event.citations` đọc qua
+`citations_from_trace` (bước 9, dùng để chấm điểm) **là 2 field khác nhau ở 2 tầng khác nhau** — chỉ
+trùng giá trị khi LLM không nói dối. `score_case` cố tình đọc **trace**, không đọc `answer`, đúng luật
+"chấm theo mặt quan sát thật" (`docs/day-05-thonluong-report.md` §1) chứ không tin lời agent tự khai.
+
+---
+
 ## Nợ đã biết của chính demo script này (khai ra, không giấu)
 
 - **§1 không đi qua Postgres** — dùng `_NoopTraceWriter` cục bộ để không cần Docker cho luồng chính.
