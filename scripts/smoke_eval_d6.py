@@ -67,6 +67,7 @@ from studio_evalhub.harness import EvalHarness, SmokeResult, _retrieved_citation
 from studio_kb.doc_factory import TENANT_IDS
 from studio_kb.static_search import StaticKbSearch
 from studio_workbench import create_recipe_d6
+from studio_workbench.tenant_wall import resolve_session
 
 _ROOT = Path(__file__).resolve().parent.parent
 _GOLDEN = _ROOT / "packages" / "kb" / "golden" / "smoke-10.yaml"
@@ -170,12 +171,14 @@ class EngineAgentRunner:
             scope=f"{slug}/{','.join(section_roles)}",
             query=query,
         )
+        session_context = resolve_session({"tenant_id": tenant_id, "user": "eval-harness", "roles": section_roles})
         result = await run(
             recipe,
             kb_search=self._kb_search,
             llm=self.llm,
             embedding=_UnusedEmbedding(),
             trace_writer=_NullTraceWriter(),
+            session_context=session_context,
         )
 
         llm_node_ids = [n.id for n in recipe.dag.nodes if n.type is NodeType.LLM_STEP]
