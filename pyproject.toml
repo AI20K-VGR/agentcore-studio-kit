@@ -19,6 +19,11 @@ dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.25",
     "import-linter>=2.1",
+    # `scripts/smoke_eval_d6.py` đọc `packages/kb/golden/smoke-10.yaml`. Trước D8 nó chạy được
+    # nhờ ĂN KÉ extra `uvicorn[standard]` (extra đó kéo pyyaml vào lock) — ai đổi
+    # `uvicorn[standard]` → `uvicorn` là mọi `import yaml` trong workspace chết IM LẶNG.
+    # Khai tường minh để phụ thuộc đó nhìn thấy được ở chỗ nó thật sự được dùng.
+    "pyyaml>=6.0",
 ]
 
 [build-system]

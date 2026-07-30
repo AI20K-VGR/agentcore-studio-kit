@@ -99,6 +99,22 @@ jobs:
         working-directory: workspace
         run: uv run --package "${{ inputs.domain_package }}" pytest "${{ inputs.domain_path }}/tests" -q
 
+      - name: Lint
+        working-directory: workspace
+        run: uv run ruff check "${{ inputs.domain_path }}"
+
+      - name: Format check
+        working-directory: workspace
+        run: uv run ruff format --check "${{ inputs.domain_path }}"
+
+      - name: Types
+        working-directory: workspace
+        run: uv run mypy "${{ inputs.domain_path }}"
+
+      - name: Quadrant fence
+        working-directory: workspace
+        run: uv run lint-imports
+
       - name: Stop pgvector test DB
         if: always()
         run: docker rm -f studio-ci-pg
