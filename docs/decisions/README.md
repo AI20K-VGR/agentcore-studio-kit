@@ -26,7 +26,7 @@ canonical_location: agentcore-studio-kit/docs/decisions/
 
 **Mỗi người tự viết file hợp đồng mình giữ bút** — không ai viết hộ người khác (đúng nguyên tắc "mỗi quadrant 1 owner", umbrella-contract §2). File này (README) chỉ là khung/index, không thay thế việc từng người tự điền.
 
-## Quyết định xuyên nhiều lane (không thuộc riêng 1 trong 4 hợp đồng trên)
+## Quyết định xuyên nhiều repo (không thuộc riêng 1 trong 4 hợp đồng trên)
 
 | # | Nội dung | Nguồn | Cần ký |
 |---|---|---|---|
