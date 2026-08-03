@@ -17,14 +17,14 @@ canonical_location: agentcore-studio-kit/docs/decisions/
 > Bản "local" từng repo (vd decision-log của DE trong `agentcore-studio-kb`) giữ nguyên làm chi
 > tiết kỹ thuật; các file dưới đây là bản tổng, cross-repo.
 
-| Hợp đồng | Bút | File | Trạng thái |
+| Hợp đồng | Bút | Nội dung thật ở đâu | Trạng thái |
 |---|---|---|---|
-| recipe | SWE | [`recipe.md`](./recipe.md) | ✅ đã tạo (SWE tự viết) |
-| trace-event | DE | *chưa tạo* | 🟡 nội dung thật đã có, đang ở PR [`agentcore-studio-kb#10`](https://github.com/AI20K-VGR/agentcore-studio-kb/pull/10) (`docs/decisions/decision-log.md`, nhánh `day11/de-contract-freeze` — chưa merge `main` nên chưa có link `blob/main` cố định) |
-| kb.search | DE | *chưa tạo* | 🟡 cùng nguồn PR kb#10 như trên |
-| scorecard | AIE-2 | *chưa tạo* | 🔴 chờ AIE-2 tự viết — hiện AIE-2 chưa có decision-log riêng nào |
+| recipe | SWE | [`agentcore-studio-workbench` PR #12](https://github.com/AI20K-VGR/agentcore-studio-workbench/blob/day11/recipe-freeze-ready/docs/decisions/recipe.md) (repo của SWE) | 🟡 đã viết, chờ merge |
+| trace-event | DE | [`agentcore-studio-kb` PR #10](https://github.com/AI20K-VGR/agentcore-studio-kb/pull/10) (`docs/decisions/decision-log.md`, repo của DE) | 🟡 đã viết, chờ merge |
+| kb.search | DE | cùng nguồn PR kb#10 như trên | 🟡 đã viết, chờ merge |
+| scorecard | AIE-2 | *chưa có* | 🔴 chờ AIE-2 tự viết trong repo của họ (`agentcore-studio-evalhub`) |
 
-**Mỗi người tự viết file hợp đồng mình giữ bút** — không ai viết hộ người khác (đúng nguyên tắc "mỗi quadrant 1 owner", umbrella-contract §2). File này (README) chỉ là khung/index, không thay thế việc từng người tự điền.
+**Nguyên tắc: nội dung thật luôn nằm trong repo của người giữ bút, không copy vào đây.** `kit` chỉ giữ link — tránh 2 bản dễ lệch nhau khi ai đó cập nhật lại quyết định của mình. Không ai viết hộ người khác (đúng nguyên tắc "mỗi quadrant 1 owner", umbrella-contract §2).
 
 ## Quyết định xuyên nhiều repo (không thuộc riêng 1 trong 4 hợp đồng trên)
 
