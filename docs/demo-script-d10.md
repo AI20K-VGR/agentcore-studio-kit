@@ -6,9 +6,10 @@
 > grounding thật (engine#10) + 2 RED-CHECK, và chưa có leg INV-1/trace-Postgres. Tài liệu này thay thế
 > cho mục đích D10.
 >
-> Mọi lệnh dưới đây **đã chạy thật** trong phiên soạn tài liệu (không chép từ mô tả), trừ leg §3 —
-> đánh dấu rõ **[CHƯA CHẠY LẠI PHIÊN NÀY]** vì cần Docker Postgres không sẵn có lúc soạn; lệnh đó đã
-> được DE xác nhận chạy thật cùng ngày trong `packages/kb/docs/evidence-d9.md` §1.
+> Mọi lệnh dưới đây **đã chạy thật** trong phiên soạn tài liệu (không chép từ mô tả). Leg §3 (trace
+> Postgres) lúc soạn hoãn vì chưa có Docker — **nay đã chạy sống ngày gate 31/07**: `test_trace_reader.py`
+> **17 passed** (bằng chứng: `docs/reports/daily-notes/2026-07-31-DongAnh2704.md`, DoD `:57` "17 passed
+> live hôm nay").
 
 ---
 
@@ -91,10 +92,11 @@ body**. Bài sau chứng minh DE: `kb.search` với tenant lệch fail-closed �
 
 ---
 
-## 3. Trace Postgres — timeline đọc lại đúng thứ tự (vai DE) — [CHƯA CHẠY LẠI PHIÊN NÀY]
+## 3. Trace Postgres — timeline đọc lại đúng thứ tự (vai DE) — ✅ ĐÃ CHẠY SỐNG 31/07
 
-Cần Docker (không có ở máy soạn tài liệu lúc này — daemon không chạy). Lệnh dưới **đã được DE xác
-nhận chạy thật hôm nay** (`packages/kb/docs/evidence-d9.md` §1, "68 passed" bao gồm 2 bài này):
+Cần Docker + 2 DSN. Lệnh dưới **DE đã chạy sống ngày gate 31/07** — `test_trace_reader.py` **17 passed**
+(7 bài đọc-lại-từ-Postgres, gồm 2 bài dưới); bằng chứng: `docs/reports/daily-notes/2026-07-31-DongAnh2704.md`
+(DoD `:57`). Số cũ `evidence-d9.md §1 "68 passed"` là lượt D9 — dòng này nay trỏ về lượt chạy sống ngày gate:
 
 ```bash
 docker compose -f docker-compose.test.yml up -d --wait
