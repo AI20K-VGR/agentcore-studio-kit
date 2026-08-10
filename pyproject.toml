@@ -64,6 +64,12 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM"]
 strict = true
 python_version = "3.14"
 plugins = ["pydantic.mypy"]
+# `conftest.py` là quy ước pytest nên không đổi tên được, và workspace giờ có nhiều file cùng tên ở
+# nhiều quadrant (`apps/studio/tests/`, `packages/evalhub/tests/`) ⇒ mypy suy ra hai module cùng tên
+# `conftest` và dừng với "Duplicate module". Loại đúng nhóm file đó khỏi mypy thay vì thêm
+# `__init__.py` vào thư mục test (đổi ngữ nghĩa thu thập của pytest) hoặc bật `explicit_package_bases`
+# (làm mọi package `*/src` phải khai lại `mypy_path`, và va với chính bản đã cài trong venv).
+exclude = ['(^|/)tests/conftest\.py$']
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
