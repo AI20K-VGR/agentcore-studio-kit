@@ -63,7 +63,7 @@ from studio_contracts.nodes import NodeType
 from studio_engine import run
 from studio_evalhub.agent_runner import AgentAnswer, CaseRun
 from studio_evalhub.golden_case import GoldenCase, GoldenSet
-from studio_evalhub.harness import EvalHarness, SmokeResult, _retrieved_citations
+from studio_evalhub.harness import EvalHarness, SmokeResult, citations_from_trace
 from studio_kb.doc_factory import TENANT_IDS
 from studio_kb.static_search import StaticKbSearch
 from studio_workbench import create_recipe_d6
@@ -246,7 +246,7 @@ async def main() -> int:
         retrieve = [e for e in cr.events if e.node_type is NodeType.KB_RETRIEVE]
         chunks = [c["chunk_id"] for e in retrieve for c in e.outputs.get("chunks", [])]
         print(f"  {case.case_id}  kb-retrieve → {len(chunks)} chunk: {chunks}")
-        print(f"         citations trong trace = {_retrieved_citations(cr.events)}  refused={cr.answer.refused}")
+        print(f"         citations trong trace = {citations_from_trace(cr.events)}  refused={cr.answer.refused}")
 
     print(f"\n  LLM đã nhận {len(set(runner.llm.prompts_seen))} prompt khác nhau cho {len(golden.cases)} case.")
     n_excerpt = sum(len(_NaiveExtractiveLLM._EXCERPT_RE.findall(p)) for p in runner.llm.prompts_seen)
