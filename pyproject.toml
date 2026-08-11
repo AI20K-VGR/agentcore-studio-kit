@@ -24,6 +24,13 @@ dev = [
     # `uvicorn[standard]` → `uvicorn` là mọi `import yaml` trong workspace chết IM LẶNG.
     # Khai tường minh để phụ thuộc đó nhìn thấy được ở chỗ nó thật sự được dùng.
     "pyyaml>=6.0",
+    # Stub type cho `pyyaml` (D17, kit#113 T6). KHÔNG khai được trước hôm nay: nó làm
+    # `# type: ignore[import-untyped]` ở `engine/scripts/{run_golden_batch,embed_harness}.py`
+    # thành THỪA ⇒ `mypy --strict` đỏ 2 lỗi `[unused-ignore]` (đo được trên pin `6857885`).
+    # `engine#22` đổi hai dòng đó sang dạng HAI error-code `[import-untyped, unused-ignore]`,
+    # hợp lệ ở CẢ hai trạng thái — nên stub và con trỏ engine phải land CÙNG PR này, không
+    # tách ra được. Đã đo trên `engine@62773ba`: mypy sạch 151 file cả khi có lẫn không có stub.
+    "types-PyYAML>=6.0",
 ]
 
 [build-system]
