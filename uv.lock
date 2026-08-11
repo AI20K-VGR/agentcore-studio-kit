@@ -95,6 +95,7 @@ dependencies = [
     { name = "agentcore-studio-contracts" },
     { name = "httpx" },
     { name = "psycopg", extra = ["binary", "pool"] },
+    { name = "pyyaml" },
 ]
 
 [package.metadata]
@@ -102,6 +103,7 @@ requires-dist = [
     { name = "agentcore-studio-contracts", editable = "packages/contracts" },
     { name = "httpx", specifier = ">=0.28" },
     { name = "psycopg", extras = ["binary", "pool"], specifier = ">=3.2" },
+    { name = "pyyaml", specifier = ">=6.0" },
 ]
 
 [[package]]
