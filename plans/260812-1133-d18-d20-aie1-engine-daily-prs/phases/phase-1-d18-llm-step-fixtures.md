@@ -107,9 +107,11 @@ không phải code AIE-1 viết trong repo mình.
 3. [x] `gh pr create --repo AI20K-VGR/agentcore-studio-engine --base main --head
    aie-1/day18-llm-step-stability` — PR#23 mở, mô tả nêu rõ: deliverable là ổn định
    `LlmStepExecutor` nội bộ, không phụ thuộc harness AIE-2 chọn (xem §Overview).
-4. [ ] Xác nhận `gh pr checks` xanh THẬT — `gh pr checks 23` đang chạy tại thời điểm cook kết
-   thúc phase này (được poll nền qua Monitor); KHÔNG tự khai xanh khi chưa có kết quả terminal
-   thật. Cập nhật dòng này khi có kết quả (xanh hoặc đỏ) — xem note cuối phase.
+4. [x] Xác nhận `gh pr checks` xanh THẬT — `gh pr checks 23 --repo AI20K-VGR/agentcore-studio-engine`
+   exit 0, mọi check `pass`/`skipping` (`ci / test-reconstructed`, `TTS deep-facts` x2, `ci /
+   lint-shallow` skip có chủ đích), không còn `pending`. Xác nhận sau khi Monitor nền timeout
+   không kết luận được (10 phút, script có vấn đề trên môi trường này) — gọi `gh pr checks` trực
+   tiếp thay thế và đọc exit code thật.
 5. [ ] **Reviewer: AIE-2 (Lưu Tiến Duy)** — chờ review (không nằm trong cook run).
 6. [ ] **Merge PR vào main của `agentcore-studio-engine`** — chờ approval rồi merge (gates phase 2,
    không nằm trong cook run).
@@ -124,9 +126,10 @@ không phải code AIE-1 viết trong repo mình.
       cũ — xác nhận bằng cách chạy lại harness thật 2 lần, không suy đoán).
 - [x] 5 lệnh regression (`pytest`/`ruff check`/`ruff format --check`/`mypy`/`lint-imports`) sạch.
 - [ ] PR riêng mở vào `agentcore-studio-engine` (PR#23, branch `aie-1/day18-llm-step-stability`,
-      commits `52d8111`+`8528883`) — **mở xong, CI + merge CHƯA xác nhận** (xem PR §4-6 ở trên).
-      Tiêu chí gốc của mục này là "mở + merge", cook run này dừng ở "mở" vì merge là hành động
-      con người ngoài phạm vi cook — không tự đánh dấu đạt tiêu chí gốc khi mới đạt một nửa.
+      commits `52d8111`+`8528883`) — **mở xong, CI xanh xác nhận (xem PR §4), merge CHƯA xác
+      nhận**. Tiêu chí gốc của mục này là "mở + merge", cook run này dừng ở "mở + CI xanh" vì
+      merge là hành động con người ngoài phạm vi cook — không tự đánh dấu đạt tiêu chí gốc khi
+      chỉ mới đạt một phần.
 
 ## Risks
 

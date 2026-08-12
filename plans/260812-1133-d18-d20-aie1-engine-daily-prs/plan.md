@@ -145,11 +145,10 @@ Bối cảnh nền đã probe thật trong phiên trước khi lập plan này (
 | 2 | D19 | kit#121 | Token accounting thật + idempotent-qua-replay + failure-mode retrieval | Độc lập kỹ thuật với phase 1 (không sửa cùng file); chạy sau D18 theo lịch, không theo code | S–M |
 | 3 | D20 | kit#126 | DAG thật đủ 6 node-type (phía engine) + tái lập trade-off table | Dùng lại field token phase 2 thêm vào `Tokens`/executor nếu phase 2 mở rộng — xác nhận tại đầu phase 3 trước khi viết code | M |
 
-**Status: Phase 1 (D18) implementation + review + test done** — 2026-08-12. PR#23
-(`aie-1/day18-llm-step-stability`, commits `52d8111`+`8528883`) mở; `gh pr checks` chạy khi cook
-kết thúc phase (kết quả terminal chưa xác nhận tại thời điểm viết dòng này — xem phase-1 file §PR
-mục 4 để biết trạng thái mới nhất). Chờ CI xanh + review + merge từ AIE-2 trước khi chạy
-`/hs:cook <plan> --phase 2`.
+**Status: Phase 1 (D18) implementation + review + test done, CI xanh** — 2026-08-12. PR#23
+(`aie-1/day18-llm-step-stability`, commits `52d8111`+`8528883`) mở, `gh pr checks 23` exit 0
+(mọi check pass/skip, không pending). Chờ review + merge từ AIE-2 trước khi chạy `/hs:cook <plan>
+--phase 2`.
 
 Không có phase nào ghi đè file `src/` của phase khác trong cùng lượt chạy — nếu phase 2 đổi
 shape `Tokens`/`TraceEvent` theo hướng cần sang `packages/contracts` (ngoài quyền ghi AIE-1),

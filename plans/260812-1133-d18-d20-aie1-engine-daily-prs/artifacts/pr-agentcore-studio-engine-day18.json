@@ -13,5 +13,6 @@
   "issue": "kit#116",
   "state_at_open": "OPEN",
   "ci_checked_via": "gh pr checks 23 --repo AI20K-VGR/agentcore-studio-engine",
+  "ci_result": "exit 0 — ci/test-reconstructed: pass, TTS deep-facts x2: pass, ci/lint-shallow: skipping (no pending)",
   "opened_at": "2026-08-12"
 }
