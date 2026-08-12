@@ -1,0 +1,17 @@
+{
+  "phase": "1",
+  "plan": "260812-1133-d18-d20-aie1-engine-daily-prs",
+  "repo": "AI20K-VGR/agentcore-studio-engine",
+  "pr_number": 23,
+  "pr_url": "https://github.com/AI20K-VGR/agentcore-studio-engine/pull/23",
+  "base": "main",
+  "head": "aie-1/day18-llm-step-stability",
+  "commits": [
+    "52d8111 feat(engine): add llm_source gateway-flag to llm-step output (kit#116)",
+    "8528883 fix(engine): D18 close code-review findings H-1/W-1..W-5/S-1..S-3 (kit#116)"
+  ],
+  "issue": "kit#116",
+  "state_at_open": "OPEN",
+  "ci_checked_via": "gh pr checks 23 --repo AI20K-VGR/agentcore-studio-engine",
+  "opened_at": "2026-08-12"
+}
