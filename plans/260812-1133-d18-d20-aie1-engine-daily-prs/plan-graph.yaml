@@ -1,0 +1,27 @@
+plan: 260812-1133-d18-d20-aie1-engine-daily-prs
+edges:
+  - {from: "1", to: "2"}
+  - {from: "2", to: "3"}
+subtasks:
+  "1":
+    files_to_create:
+      - packages/engine/tests/test_llm_step_output_stability.py
+    files_to_modify:
+      - packages/engine/src/studio_engine/executors.py
+      - packages/engine/src/studio_engine/demo_stubs.py
+    post: ["verification-1.json", "review-decision-1.json", "pr-agentcore-studio-engine-day18.json"]
+  "2":
+    files_to_create:
+      - packages/engine/tests/test_llm_step_token_accounting.py
+      - packages/engine/docs/design-notes/aie1-day19-retrieval-failure-modes.md
+    files_to_modify:
+      - packages/engine/src/studio_engine/executors.py
+      - packages/engine/tests/test_executors_behavior.py
+    post: ["verification-2.json", "review-decision-2.json", "pr-agentcore-studio-engine-day19.json"]
+  "3":
+    files_to_create:
+      - packages/engine/scripts/run_spine_dag_6node.py
+      - packages/engine/tests/test_dag_6node_spine.py
+    files_to_modify:
+      - packages/engine/docs/design-notes/aie1-day14-grid-harness.md
+    post: ["verification-3.json", "review-decision-3.json", "pr-agentcore-studio-engine-day20.json"]

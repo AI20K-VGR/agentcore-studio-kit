@@ -1,0 +1,17 @@
+schema: plan-approval/v1
+plan: 260812-1133-d18-d20-aie1-engine-daily-prs
+plan_hash: ac59676c430e
+file_hashes:
+  plan.md: '785335183918'
+  phase-1-d18-llm-step-fixtures.md: cd5d2f511fd1
+  phase-2-d19-tokens-idempotent-retrieval-failure-modes.md: 771ca72622de
+  phase-3-d20-dag-real-spine-trade-off.md: 7aed50170e01
+  plan-graph.yaml: 85beb1f364fb
+author: user:tranbadat26072004@gmail.com
+reviewer: user:tranbadat26072004@gmail.com
+verdict: APPROVED
+rationale: User (AIE-1, team lead) reviewed plan.md + 3 phase files after red-team
+  pass (7 findings fixed); confirms 3-phase/3-PR structure, cook invocation via --phase
+  N, merge-before-next-phase git flow
+ts: '2026-08-12T05:27:56.980595+00:00'
+run_seq: null
