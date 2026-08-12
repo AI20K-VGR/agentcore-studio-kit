@@ -1,20 +1,40 @@
 verdict: PASS
 reviewer: user:tranbadat26072004@gmail.com
 role: reviewer
-rationale: 'hs:code-reviewer independently reviewed phase-1 diff (commit 62773ba..52d8111
-  in packages/engine, agentcore-studio-engine): additive-only, no public-contract
-  breaks, 5/5 regression clean, no full-dict-literal test broken, interpreter pass-through
-  confirmed unchanged. Verdict was PASS_WITH_RISK 7.0/10 with 1 high (H-1: llm_source
-  misclassified the two real running harnesses _GoldenAwareLLM/ExtractiveFakeLLM as
-  gateway despite being fixture/fake replay) + 5 warnings (W-1/W-5: PYTHONHASHSEED
-  stability test was tautological since citations was always [] with no retrieved_chunks
-  wired in; W-2: only 2 of the reference pattern''s 3 seeds used; W-3: misattributed
-  docs/code-standards.md SS4.1 citation; W-4: a fixture recorded a false-negative
-  refused trap) + 3 suggestions. All 8 findings were fixed in commit 8528883 (fix(engine):
-  D18 close code-review findings H-1/W-1..W-5/S-1..S-3) and independently re-verified
-  by main: re-read _GoldenAwareLLM/ExtractiveFakeLLM source to confirm both are pure
-  fixture/fake replay with no live model call before accepting the frozenset addition;
-  re-ran all 5 regression commands + run_golden_batch.py (30/30) after the fix commit,
-  all clean. No blocking findings remain.'
+rationale: 'hs:code-reviewer independently reviewed phase-2 diff (working tree,
+  branch aie-1/day19-tokens-idempotent-failure-modes in packages/engine, cut from
+  origin/main after PR#23/D18 merge): real whitespace-split token accounting in
+  LlmStepExecutor.execute(), test_executors_behavior.py assertion fix, new
+  test_llm_step_token_accounting.py (real+idempotent-in-process+idempotent-across-
+  PYTHONHASHSEED), and aie1-day19-retrieval-failure-modes.md design-note. First
+  pass verdict was BLOCKED on 2 must-fix findings (B-1: design-note falsely
+  claimed no test locks the section_roles deny-all branch when 2 tests already
+  do; B-2: design-note misattributed the D17 KbSearchService flip to PgKbSearch,
+  which has actually been on the spine since D13) plus 3 should-fix findings
+  (H-1: executors.py KbRetrieveExecutor docstring still had a stale
+  DE-blocked/NotImplementedError claim contradicting the new design-note in the
+  same diff; H-2: the new token test used a 1-word placeholder prompt, weak
+  enough that a hardcoded non-zero constant would still pass; H-3: docstring did
+  not clarify which "prompt" variable is counted, an order-of-magnitude-relevant
+  ambiguity for DE pricing cost off this field). All 5 fixed by @developer +
+  2 low-severity fixes (L-1 unlabeled ~2-3x claim, L-5 subprocess check=True
+  swallowing stderr); main independently re-verified each fix against live
+  source before accepting. Second review pass found a fresh regression the fix
+  round introduced (R-2: a line the fix round rewrote now mislabeled 2 pytest.skip
+  e2e stubs as "Test khoa"/locking tests) plus a line-anchor drift (R-1) and an
+  unlabeled numeric claim (R-3, "roughly 2-3x" stated as fact with no tokenizer
+  in the kit to measure it) — main fixed all 4 directly (small text-only edits,
+  no behavior change) and re-verified. Third review pass returned
+  PASS_WITH_RISK: F-1, a benign off-by-one-line drift across 6 design-note
+  anchors caused by the R-2 edit shifting line numbers by 1 (no false claims,
+  just numbers stale by 1 — the reviewer explicitly did not block on this,
+  calling a 4th block round "optimizing for my own consistency, not the repo").
+  Main fixed all 6 anchors (docs-only .md edit, verified each target line
+  against live executors.py with sed before writing) and re-ran the full 6-command
+  regression gate one final time (163 passed, 30/30 golden batch, ruff/mypy/
+  lint-imports clean) — no further review round requested since the only
+  remaining risk was mechanical and already closed with evidence. No blocking
+  findings remain; scope fence held throughout (only packages/engine touched,
+  Tokens contract shape unchanged, no new NodeType).'
 effort: low
 run_seq: null

@@ -145,10 +145,15 @@ Bối cảnh nền đã probe thật trong phiên trước khi lập plan này (
 | 2 | D19 | kit#121 | Token accounting thật + idempotent-qua-replay + failure-mode retrieval | Độc lập kỹ thuật với phase 1 (không sửa cùng file); chạy sau D18 theo lịch, không theo code | S–M |
 | 3 | D20 | kit#126 | DAG thật đủ 6 node-type (phía engine) + tái lập trade-off table | Dùng lại field token phase 2 thêm vào `Tokens`/executor nếu phase 2 mở rộng — xác nhận tại đầu phase 3 trước khi viết code | M |
 
-**Status: Phase 1 (D18) implementation + review + test done, CI xanh** — 2026-08-12. PR#23
-(`aie-1/day18-llm-step-stability`, commits `52d8111`+`8528883`) mở, `gh pr checks 23` exit 0
-(mọi check pass/skip, không pending). Chờ review + merge từ AIE-2 trước khi chạy `/hs:cook <plan>
---phase 2`.
+**Status: Phase 1 (D18) merged** — 2026-08-12. PR#23 review-approved + merged vào `main`
+(`agentcore-studio-engine`, merge commit `941c8a0`).
+
+**Status: Phase 2 (D19) implementation + review + test done, CI xanh** — 2026-08-12. PR#24
+(`aie-1/day19-tokens-idempotent-failure-modes`, commit `ec75541`, cắt từ `origin/main` SAU KHI
+PR#23 merge) mở, `gh pr checks 24` exit 0 (mọi check pass/skip, không pending). Review độc lập 3
+vòng (BLOCKED → BLOCKED thu hẹp → PASS_WITH_RISK → đóng hết) — chi tiết đầy đủ ở
+`artifacts/review-decision.yaml`. Chờ review + merge từ DE (Đông Anh) trước khi chạy
+`/hs:cook <plan> --phase 3`.
 
 Không có phase nào ghi đè file `src/` của phase khác trong cùng lượt chạy — nếu phase 2 đổi
 shape `Tokens`/`TraceEvent` theo hướng cần sang `packages/contracts` (ngoài quyền ghi AIE-1),
