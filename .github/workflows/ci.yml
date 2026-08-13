@@ -28,6 +28,10 @@ jobs:
           version: ${{ env.UV_VERSION }}
       - run: uv sync --frozen
       - run: uv run ruff check .
+      # Bước này khớp với CI của repo con (reusable-domain-ci.yml:106-108). Thiếu nó, gốc kit
+      # là chỗ DUY NHẤT trong workspace không có gate format — đo được: tests/test_ops.py nằm
+      # trên main từ 14a3044 (18/07) mà không format-clean, và không gì bắt suốt từ đó.
+      - run: uv run ruff format --check .
       - run: uv run mypy packages apps
       - run: uv run lint-imports
 
