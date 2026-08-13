@@ -186,6 +186,71 @@ corepack enable pnpm && pnpm install && pnpm build   # or: npm install && npm ru
 pnpm dev   # local dev server
 ```
 
+## Chạy thử demo Kế hoạch 2 (login → canvas → Test → Publish → Chat)
+
+`make demo` (target ở trên) hiện chỉ là placeholder — chưa nối harness E2E thật (P10). Muốn tự
+tay chạy thử luồng demo `apps/studio` + `apps/web` (login → dựng canvas → Test → chấm điểm →
+Publish → Chat), làm theo đúng các bước dưới, đã tự chạy thật trên Ubuntu 24.04 để xác nhận.
+
+### Cần cài gì trên máy — KHÔNG cần `pip install` gì cả
+
+| Công cụ | Cần cho | Ghi chú |
+|---|---|---|
+| `uv >=0.11` | Toàn bộ 6 Python member | `uv` tự quản Python riêng (`uv python install`), tự tạo venv qua `uv sync` — **không cần** cài Python hệ thống hay `pip install` tay bất cứ gói nào. |
+| Docker (+ compose plugin) | Postgres/pgvector | `docker compose up -d` (dev stack, port 5432) hoặc `docker compose -f docker-compose.test.yml up -d` (test stack, port 5433, dùng cho bước dưới). |
+| Node.js + npm | `apps/web` | `apps/web` KHÔNG nằm trong `uv` workspace (Vite/TS riêng) — cần Node để `npm install`/`npm run dev`. |
+
+`pip install` duy nhất xuất hiện trong repo là dòng ghi chú optional `pip install .[obs]` (Langfuse,
+`.env.example`) — không cần cho demo, không cần cho bất kỳ `make` target nào ở trên.
+
+### Các bước
+
+```bash
+# 1. Cài dependency Python + copy env mẫu
+make setup
+cp .env.example .env
+# Sửa .env: STUDIO_JWT_SECRET đổi khỏi "changeme" (bất kỳ chuỗi nào cũng chạy được lúc dev,
+# xem `openssl rand -hex 32` để sinh khoá thật nếu cần dùng nghiêm túc hơn demo).
+
+# 2. Bật Postgres — dùng ĐÚNG dev stack (docker-compose.yml, port 5432, db "studio"), khớp
+# NGUYÊN VẸN giá trị mặc định trong .env.example — không cần sửa STUDIO_DATABASE_URL nào cả.
+# (docker-compose.test.yml là stack RIÊNG cho `make test-int`/CI, port 5433 khác — đừng lẫn 2
+# stack, .env chỉ trỏ đúng 1 trong 2.)
+docker compose up -d
+
+# 3. Seed 2 tenant demo (ankor/borea) — BẮT BUỘC trước lần chạy đầu, và sau MỖI LẦN chạy
+# `make test`/`pytest` (fixture `admin_pool` truncate toàn bộ bảng, kể cả `core.tenants`).
+# CHẠY TỪ GỐC KIT, ĐỪNG `cd apps/studio` trước — `.env` chỉ nằm ở gốc kit, Settings() tìm
+# `.env` theo thư mục đang đứng (CWD) khi lệnh chạy, không theo vị trí file script.
+uv run python apps/studio/scripts/seed_demo_tenants.py
+
+# 4. Chạy backend (apps/studio) — cửa sổ terminal riêng
+uv run uvicorn studio_app.app:create_app --factory --app-dir apps/studio/src --host 127.0.0.1 --port 8000 --reload
+
+# 5. Chạy frontend (apps/web) — cửa sổ terminal riêng
+cd apps/web
+npm install
+npm run dev   # mặc định http://127.0.0.1:5173
+```
+
+Mở `http://127.0.0.1:5173`, đăng nhập bằng 1 trong các email demo sau (không cần mật khẩu —
+`_DEMO_ACCOUNTS`, `apps/studio/src/studio_app/routes/auth.py`, tenant + roles gán sẵn, không tự
+chọn được):
+
+| Email | Tenant | Roles | Giao diện thấy |
+|---|---|---|---|
+| `admin@ankor.vn` | ankor | `admin` | Đầy đủ — 2 tab Canvas + Chat |
+| `hr@ankor.vn` | ankor | `hr` | Chỉ khung Chat |
+| `finance@ankor.vn` | ankor | `finance` | Chỉ khung Chat |
+| `guest@ankor.vn` | ankor | *(rỗng)* | Chỉ khung Chat, không role nào |
+| `admin@borea.vn` | borea | `admin` | Đầy đủ — 2 tab Canvas + Chat |
+| `nhanvien@borea.vn` | borea | `public, hr` | Chỉ khung Chat |
+
+Tài khoản `admin@*` mới thấy canvas kéo thả — dựng DAG, bấm Test (chạy `interpreter` thật, hiện
+trace/cost thật), rồi Publish (tự chạy `EvalHarness` trên nguyên golden-set + gate trong 1 lần
+bấm). `Publish` hiện tại LUÔN trả 409 (`recipe_hash is None`) cho tới khi AIE-2 xong producer
+(DEC-03, xem kit#127) — đây là hành vi ĐÚNG mong đợi của hệ thống, không phải bug môi trường.
+
 ## CI + branch protection (F16)
 
 GitHub Actions (`.github/workflows/ci.yml`) is the CI **SSOT**; `.gitlab-ci.yml` is a minimal

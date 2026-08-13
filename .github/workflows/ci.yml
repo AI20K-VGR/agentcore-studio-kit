@@ -58,6 +58,12 @@ jobs:
     env:
       STUDIO_DATABASE_URL: postgresql://studio_app:changeme@localhost:5433/studio_test
       STUDIO_DATABASE_URL_ADMIN: postgresql://studio_owner:changeme@localhost:5433/studio_test
+      # CI-only, không phải secret thật — apps_app.settings.Settings.jwt_secret bắt buộc (không
+      # default) từ khi có JWT thật. Thiếu biến này thì test (agentcore-studio-app, ...) đỏ, kể cả
+      # test cũ không liên quan JWT (Settings() validate hết field bắt buộc lúc khởi tạo). Đã vá
+      # 1 lần ở reusable-domain-ci.yml (dùng cho CI riêng của mỗi domain repo) — file NÀY là CI
+      # CỦA CHÍNH kit (chạy khi PR/push thẳng vào kit), tách biệt hoàn toàn, cần vá riêng.
+      STUDIO_JWT_SECRET: ci-test-secret-not-for-production
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/init-submodules
@@ -106,6 +112,12 @@ jobs:
     env:
       STUDIO_DATABASE_URL: postgresql://studio_app:changeme@localhost:5433/studio_test
       STUDIO_DATABASE_URL_ADMIN: postgresql://studio_owner:changeme@localhost:5433/studio_test
+      # CI-only, không phải secret thật — apps_app.settings.Settings.jwt_secret bắt buộc (không
+      # default) từ khi có JWT thật. Thiếu biến này thì test (agentcore-studio-app, ...) đỏ, kể cả
+      # test cũ không liên quan JWT (Settings() validate hết field bắt buộc lúc khởi tạo). Đã vá
+      # 1 lần ở reusable-domain-ci.yml (dùng cho CI riêng của mỗi domain repo) — file NÀY là CI
+      # CỦA CHÍNH kit (chạy khi PR/push thẳng vào kit), tách biệt hoàn toàn, cần vá riêng.
+      STUDIO_JWT_SECRET: ci-test-secret-not-for-production
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/init-submodules
