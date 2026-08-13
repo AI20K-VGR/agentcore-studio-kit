@@ -212,13 +212,17 @@ cp .env.example .env
 # Sửa .env: STUDIO_JWT_SECRET đổi khỏi "changeme" (bất kỳ chuỗi nào cũng chạy được lúc dev,
 # xem `openssl rand -hex 32` để sinh khoá thật nếu cần dùng nghiêm túc hơn demo).
 
-# 2. Bật Postgres (chọn 1 trong 2 stack — ví dụ dùng stack test, port 5433, khớp STUDIO_DATABASE_URL
-# trong .env nếu bạn trỏ vào đó)
-docker compose -f docker-compose.test.yml up -d --wait
+# 2. Bật Postgres — dùng ĐÚNG dev stack (docker-compose.yml, port 5432, db "studio"), khớp
+# NGUYÊN VẸN giá trị mặc định trong .env.example — không cần sửa STUDIO_DATABASE_URL nào cả.
+# (docker-compose.test.yml là stack RIÊNG cho `make test-int`/CI, port 5433 khác — đừng lẫn 2
+# stack, .env chỉ trỏ đúng 1 trong 2.)
+docker compose up -d
 
 # 3. Seed 2 tenant demo (ankor/borea) — BẮT BUỘC trước lần chạy đầu, và sau MỖI LẦN chạy
-# `make test`/`pytest` (fixture `admin_pool` truncate toàn bộ bảng, kể cả `core.tenants`)
-cd apps/studio && uv run python scripts/seed_demo_tenants.py && cd ../..
+# `make test`/`pytest` (fixture `admin_pool` truncate toàn bộ bảng, kể cả `core.tenants`).
+# CHẠY TỪ GỐC KIT, ĐỪNG `cd apps/studio` trước — `.env` chỉ nằm ở gốc kit, Settings() tìm
+# `.env` theo thư mục đang đứng (CWD) khi lệnh chạy, không theo vị trí file script.
+uv run python apps/studio/scripts/seed_demo_tenants.py
 
 # 4. Chạy backend (apps/studio) — cửa sổ terminal riêng
 uv run uvicorn studio_app.app:create_app --factory --app-dir apps/studio/src --host 127.0.0.1 --port 8000 --reload
