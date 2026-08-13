@@ -40,6 +40,11 @@ jobs:
     env:
       STUDIO_DATABASE_URL: postgresql://studio_app:changeme@localhost:5433/studio_test
       STUDIO_DATABASE_URL_ADMIN: postgresql://studio_owner:changeme@localhost:5433/studio_test
+      # CI-only, không phải secret thật — apps_app.settings.Settings.jwt_secret bắt buộc (không
+      # default) từ khi có JWT thật (kit#153). Thiếu biến này thì MỌI domain (không riêng
+      # apps/studio) đỏ CI nếu code nào đó chạm get_settings() từ env, kể cả test không liên quan
+      # JWT — Settings() là 1 model, thiếu field bắt buộc là ValidationError ngay lúc khởi tạo.
+      STUDIO_JWT_SECRET: ci-test-secret-not-for-production
     steps:
       - name: Checkout domain (PR head)
         uses: actions/checkout@v7
