@@ -38,9 +38,7 @@ def test_compose_config_valid() -> None:
         f"stdout={default_result.stdout}\nstderr={default_result.stderr}"
     )
 
-    full_result = _run(
-        ["docker", "compose", "-f", str(compose_path), "--profile", "app", "--profile", "obs", "config"]
-    )
+    full_result = _run(["docker", "compose", "-f", str(compose_path), "--profile", "app", "--profile", "obs", "config"])
     assert full_result.returncode == 0, (
         f"docker compose config (app+obs profiles) failed:\nstdout={full_result.stdout}\nstderr={full_result.stderr}"
     )
@@ -134,8 +132,15 @@ def test_nda_denylist_catches_pluralized_and_concatenated() -> None:
     assert block_match, "could not locate DENYLIST_PATTERNS array"
     patterns = re.findall(r"'([^']+)'", block_match.group(1))
     assert patterns, "could not extract DENYLIST_PATTERNS"
-    must_block = ["docs/rubrics/week1.md", "mentornotes.md", "src/solutions/answer.py",
-                  "grading/key.csv", "mentor-guide.md", "x.rubric.yaml", "answer_keys.txt"]
+    must_block = [
+        "docs/rubrics/week1.md",
+        "mentornotes.md",
+        "src/solutions/answer.py",
+        "grading/key.csv",
+        "mentor-guide.md",
+        "x.rubric.yaml",
+        "answer_keys.txt",
+    ]
     for name in must_block:
         assert any(re.search(p, name, re.IGNORECASE) for p in patterns), f"NDA denylist must block {name!r}"
     for ok in ["packages/kb/src/studio_kb/search.py", "README.md", "apps/web/src/App.tsx"]:
