@@ -224,10 +224,24 @@ docker compose up -d
 # `.env` theo thư mục đang đứng (CWD) khi lệnh chạy, không theo vị trí file script.
 uv run python apps/studio/scripts/seed_demo_tenants.py
 
-# 4. Chạy backend (apps/studio) — cửa sổ terminal riêng
+# 4. Chạy backend (apps/studio) — cửa sổ terminal riêng. Lần khởi động này chạy lifespan = dựng
+# schema (`ensure_all_schemas`) + CẤP QUYỀN DML cho role `studio_app` (`grant_app_privileges`,
+# `app.py:39-40`). PHẢI lên TRƯỚC bước 5: `studio_app` chỉ có quyền INSERT vào `kb.chunks` SAU khi
+# backend boot — chạy ingest trước sẽ gãy `permission denied for schema kb`.
 uv run uvicorn studio_app.app:create_app --factory --app-dir apps/studio/src --host 127.0.0.1 --port 8000 --reload
 
-# 5. Chạy frontend (apps/web) — cửa sổ terminal riêng
+# 5. Nạp corpus Callisto vào kb.chunks (42 doc / 140 chunk: ankor 71 · borea 69) — CHẠY TỪ GỐC KIT,
+# cửa sổ terminal riêng, SAU khi backend (bước 4) đã in "Application startup complete". BẮT BUỘC
+# trước khi demo chat/retrieval. Sau mỗi lần `make test`/`pytest` (fixture truncate `kb.chunks` +
+# `core.tenants`) chỉ cần chạy lại BƯỚC 3 + 5 — KHÔNG phải restart backend (truncate xoá dòng, không
+# xoá grants). THIẾU BƯỚC NÀY → `kb.search` trả RỖNG, chat không ra kết quả.
+# Script đọc `STUDIO_DATABASE_URL` từ BIẾN MÔI TRƯỜNG (không tự nạp .env như backend) → export đúng
+# dev-stack DSN dưới đây; KHỚP NGUYÊN VẸN .env.example, role non-owner `studio_app` để RLS WITH CHECK
+# còn cắn. Idempotent — chạy lại không nhân đôi.
+export STUDIO_DATABASE_URL=postgresql://studio_app:changeme@localhost:5432/studio
+uv run python packages/kb/scripts/ingest_callisto.py
+
+# 6. Chạy frontend (apps/web) — cửa sổ terminal riêng
 cd apps/web
 npm install
 npm run dev   # mặc định http://127.0.0.1:5173
