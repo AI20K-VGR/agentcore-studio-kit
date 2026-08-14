@@ -239,15 +239,17 @@ chọn được):
 
 | Email | Tenant | Roles | Giao diện thấy |
 |---|---|---|---|
-| `admin@ankor.vn` | ankor | `admin` | Đầy đủ — 2 tab Canvas + Chat |
+| `admin@ankor.vn` | ankor | `admin, public, hr, finance, engineering` | Đầy đủ — 2 tab Canvas + Chat |
 | `hr@ankor.vn` | ankor | `hr` | Chỉ khung Chat |
 | `finance@ankor.vn` | ankor | `finance` | Chỉ khung Chat |
 | `guest@ankor.vn` | ankor | *(rỗng)* | Chỉ khung Chat, không role nào |
-| `admin@borea.vn` | borea | `admin` | Đầy đủ — 2 tab Canvas + Chat |
+| `admin@borea.vn` | borea | `admin, public, hr, finance, engineering` | Đầy đủ — 2 tab Canvas + Chat |
 | `nhanvien@borea.vn` | borea | `public, hr` | Chỉ khung Chat |
 
 Tài khoản `admin@*` mới thấy canvas kéo thả — dựng DAG, bấm Test (chạy `interpreter` thật, hiện
-trace/cost thật), rồi Publish (tự chạy `EvalHarness` trên nguyên golden-set + gate trong 1 lần
+trace/cost thật). `admin@*` được gán đủ cả 4 role nội dung (`public/hr/finance/engineering`) nên
+Test ra chunk KB thật, không rỗng — 3 tài khoản còn lại (`hr@*`/`finance@*`/`nhanvien@borea.vn`)
+không thấy canvas nên chỉ thử qua khung Chat. Rồi Publish (tự chạy `EvalHarness` trên nguyên golden-set + gate trong 1 lần
 bấm). `Publish` hiện tại LUÔN trả 409 (`recipe_hash is None`) cho tới khi AIE-2 xong producer
 (DEC-03, xem kit#127) — đây là hành vi ĐÚNG mong đợi của hệ thống, không phải bug môi trường.
 
