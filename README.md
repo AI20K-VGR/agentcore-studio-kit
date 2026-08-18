@@ -316,9 +316,14 @@ PY
 rỗng, vì role có đủ cả 4 role nội dung). Cùng cách này, đổi `ANKOR_ID`/email/roles để tạo tài khoản
 chỉ có 1 role nội dung (thử ca "chỉ thấy Chat, không thấy canvas" — role thiếu `"admin"`).
 
-Rồi Publish (tự chạy `EvalHarness` trên nguyên golden-set + gate trong 1 lần bấm). `Publish` hiện
-tại LUÔN trả 409 (`recipe_hash is None`) cho tới khi AIE-2 xong producer (DEC-03, xem kit#127) —
-đây là hành vi ĐÚNG mong đợi của hệ thống, không phải bug môi trường.
+Rồi Publish (tự chạy `EvalHarness` trên nguyên golden-set + gate trong 1 lần bấm).
+
+**`recipe_hash` (DEC-03) giờ có producer thật** — `studio_workbench.publish.recipe_hash()`, đang
+chờ merge ở [`agentcore-studio-workbench#27`](https://github.com/AI20K-VGR/agentcore-studio-workbench/pull/27)
+(SAU đó nối vào `apps/studio` ở 1 PR riêng, xem PR đó để biết số). **Tới khi CẢ HAI merge**, `Publish`
+vẫn LUÔN trả 409 (`recipe_hash is None`) — đây là hành vi ĐÚNG mong đợi của hệ thống với code hiện
+tại trên `main`, không phải bug môi trường. Sau khi merge xong, `Publish` chỉ còn 409 khi
+`gate.verdict == "FAIL"` thật (agent chưa đạt ngưỡng), không còn LUÔN 409 vô điều kiện nữa.
 
 ## CI + branch protection (F16)
 
