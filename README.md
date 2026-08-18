@@ -230,7 +230,13 @@ uv run python apps/studio/scripts/seed_demo_tenants.py
 # schema (`ensure_all_schemas`) + CẤP QUYỀN DML cho role `studio_app` (`grant_app_privileges`,
 # `app.py:39-40`). PHẢI lên TRƯỚC bước 5: `studio_app` chỉ có quyền INSERT vào `kb.chunks` SAU khi
 # backend boot — chạy ingest trước sẽ gãy `permission denied for schema kb`.
-uv run uvicorn studio_app.app:create_app --factory --app-dir apps/studio/src --host 127.0.0.1 --port 8000 --reload
+# `--no-proxy-headers` (kit#18): uvicorn mặc định tự tin `X-Forwarded-For` từ MỌI kết nối tới từ
+# 127.0.0.1 (kể cả `curl localhost` ngay trên máy này) và ghi đè `request.client` TRƯỚC KHI app
+# thấy request — độc lập với `STUDIO_TRUST_X_FORWARDED_FOR`, nên bỏ cờ này thì rate-limit
+# `/api/auth/login` né được bằng cách tự set header giả, không cần chạm gì tới cờ app. CHỈ bỏ cờ
+# này (và bật `STUDIO_TRUST_X_FORWARDED_FOR=true`) khi triển khai THẬT có reverse proxy đáng tin
+# GHI ĐÈ (không nối thêm) `X-Forwarded-For` trước khi tới app.
+uv run uvicorn studio_app.app:create_app --factory --app-dir apps/studio/src --host 127.0.0.1 --port 8000 --reload --no-proxy-headers
 
 # 5. Nạp corpus Callisto vào kb.chunks (42 doc / 140 chunk: ankor 71 · borea 69) — CHẠY TỪ GỐC KIT,
 # cửa sổ terminal riêng, SAU khi backend (bước 4) đã in "Application startup complete". BẮT BUỘC

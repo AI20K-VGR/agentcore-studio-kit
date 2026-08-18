@@ -30,6 +30,12 @@ services:
       retries: 30
 
   app:
+    # Giới hạn đã biết (kit#18): stack này là dev/local (comment đầu file). Khi publish port 8000
+    # ra host, mọi client tới qua NAT của Docker đều chung 1 `inet_client_addr` (gateway) — rate-limit
+    # `/api/auth/login` (key theo IP) gộp MỌI người dùng thật vào 1 bucket. KHÔNG expose service này
+    # thẳng ra internet mà không có reverse proxy thật đứng trước (ghi đè `X-Forwarded-For`, bật
+    # `STUDIO_TRUST_X_FORWARDED_FOR=true`) — image tự chạy với `--no-proxy-headers` (Dockerfile),
+    # nên không tự nhận `X-Forwarded-For` nào cho tới khi cấu hình đúng cặp đó.
     build: .
     profiles: ["app"]
     depends_on:
