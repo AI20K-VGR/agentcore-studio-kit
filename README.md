@@ -230,7 +230,7 @@ uv run python apps/studio/scripts/seed_demo_tenants.py
 # schema (`ensure_all_schemas`) + CẤP QUYỀN DML cho role `studio_app` (`grant_app_privileges`,
 # `app.py:39-40`). PHẢI lên TRƯỚC bước 5: `studio_app` chỉ có quyền INSERT vào `kb.chunks` SAU khi
 # backend boot — chạy ingest trước sẽ gãy `permission denied for schema kb`.
-# `--no-proxy-headers` (kit#18): uvicorn mặc định tự tin `X-Forwarded-For` từ MỌI kết nối tới từ
+# `--no-proxy-headers` (app#18): uvicorn mặc định tự tin `X-Forwarded-For` từ MỌI kết nối tới từ
 # 127.0.0.1 (kể cả `curl localhost` ngay trên máy này) và ghi đè `request.client` TRƯỚC KHI app
 # thấy request — độc lập với `STUDIO_TRUST_X_FORWARDED_FOR`, nên bỏ cờ này thì rate-limit
 # `/api/auth/login` né được bằng cách tự set header giả, không cần chạm gì tới cờ app. CHỈ bỏ cờ
