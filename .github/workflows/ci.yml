@@ -64,6 +64,10 @@ jobs:
       # 1 lần ở reusable-domain-ci.yml (dùng cho CI riêng của mỗi domain repo) — file NÀY là CI
       # CỦA CHÍNH kit (chạy khi PR/push thẳng vào kit), tách biệt hoàn toàn, cần vá riêng.
       STUDIO_JWT_SECRET: ci-test-secret-not-for-production
+      # Cùng lý do STUDIO_JWT_SECRET ở trên (app#19): Settings.llm_provider giờ required, không
+      # default — file NÀY là CI của chính kit, tách biệt hoàn toàn khỏi reusable-domain-ci.yml
+      # (đã vá riêng), phải vá lại ở đây (review Step-5 bắt thiếu sót này trước khi merge).
+      STUDIO_LLM_PROVIDER: gemini
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/init-submodules
@@ -118,6 +122,10 @@ jobs:
       # 1 lần ở reusable-domain-ci.yml (dùng cho CI riêng của mỗi domain repo) — file NÀY là CI
       # CỦA CHÍNH kit (chạy khi PR/push thẳng vào kit), tách biệt hoàn toàn, cần vá riêng.
       STUDIO_JWT_SECRET: ci-test-secret-not-for-production
+      # Cùng lý do STUDIO_JWT_SECRET ở trên (app#19): Settings.llm_provider giờ required, không
+      # default — file NÀY là CI của chính kit, tách biệt hoàn toàn khỏi reusable-domain-ci.yml
+      # (đã vá riêng), phải vá lại ở đây (review Step-5 bắt thiếu sót này trước khi merge).
+      STUDIO_LLM_PROVIDER: gemini
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/init-submodules
