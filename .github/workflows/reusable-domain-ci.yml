@@ -45,6 +45,12 @@ jobs:
       # apps/studio) đỏ CI nếu code nào đó chạm get_settings() từ env, kể cả test không liên quan
       # JWT — Settings() là 1 model, thiếu field bắt buộc là ValidationError ngay lúc khởi tạo.
       STUDIO_JWT_SECRET: ci-test-secret-not-for-production
+      # Cùng lý do STUDIO_JWT_SECRET ở trên (app#19): Settings.llm_provider giờ required, không
+      # default — đặt ở khối env CHUNG này (không phải per-job riêng apps/studio) vì package nào
+      # chạm get_settings() qua import gián tiếp cũng cần biến này có mặt, dù chỉ apps/studio's
+      # test thật sự dùng tới. Không thêm STUDIO_OPENAI_API_KEY: use_fake_providers default True
+      # trong test nên openai_api_key/gemini_api_key vẫn hợp lệ ở None (Optional).
+      STUDIO_LLM_PROVIDER: gemini
     steps:
       - name: Checkout domain (PR head)
         uses: actions/checkout@v7

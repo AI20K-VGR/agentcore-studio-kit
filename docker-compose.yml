@@ -47,6 +47,11 @@ services:
       STUDIO_DATABASE_URL: ${STUDIO_DATABASE_URL:-postgresql://studio_app:changeme@postgres:5432/studio}
       STUDIO_DATABASE_URL_ADMIN: ${STUDIO_DATABASE_URL_ADMIN:-postgresql://studio_owner:changeme@postgres:5432/studio}
       STUDIO_GEMINI_API_KEY: ${STUDIO_GEMINI_API_KEY:-changeme}
+      # required, KHÔNG default (đúng tinh thần DEC-1 xuyên mọi tầng — pydantic Settings đã
+      # required-no-default, compose-level default sẽ âm thầm che mất field đó, phá đúng chủ ý
+      # "giá trị thiếu phải ồn"): compose tự fail rõ ràng nếu thiếu, không boot êm về rollback.
+      STUDIO_LLM_PROVIDER: ${STUDIO_LLM_PROVIDER:?set STUDIO_LLM_PROVIDER=openai hoặc gemini trong .env}
+      STUDIO_OPENAI_API_KEY: ${STUDIO_OPENAI_API_KEY:-changeme}
       STUDIO_ENABLE_TRACING: ${STUDIO_ENABLE_TRACING:-false}
       STUDIO_USE_FAKE_PROVIDERS: ${STUDIO_USE_FAKE_PROVIDERS:-true}
 

@@ -98,7 +98,7 @@ song song không đụng file nhau (xem §8).
 | `packages/engine` | `studio_engine` | `agentcore-studio-engine` | AIE-1 — Trần Bá Đạt | — (stateless) | `registry.py` (`NodeType`→executor map), `executors.py` (6 executor, spec), `interpreter.py` (`run()`, spec) |
 | `packages/workbench` | `studio_workbench` | `agentcore-studio-workbench` | SWE — Thiệu Quang Minh | `wb.*` | `schema.py` (DDL), `validator.py` (`graph_lint`, spec), `publish.py` (`publish`/`rollback`, spec), `tenant_wall.py` (`resolve_tenant`, spec) |
 | `packages/evalhub` | `studio_evalhub` | `agentcore-studio-evalhub` | AIE-2 — Lưu Tiến Duy | `eval.*` | `schema.py` (DDL), `harness.py` (`EvalHarness`, spec), `judge.py` (`LLMJudge`, spec), `compute.py` (`compute_scorecard`, spec) |
-| `apps/studio` | `studio_app` | `agentcore-studio-app` | mentor (composition) | `core.*` + `obs.*` (shell) | `app.py` (FastAPI factory), `middleware.py` (tenant-context), `core/_db.py` (pool split), `core/schema.py` (`ensure_all_schemas`/`grant_app_privileges`), `core/queue.py`, `core/outbox.py`, `settings.py`, `providers/{gemini,fakes}.py`, `obs/{schema,tracing,trace_writer}.py`, `worker/consumer.py` |
+| `apps/studio` | `studio_app` | `agentcore-studio-app` | mentor (composition) | `core.*` + `obs.*` (shell) | `app.py` (FastAPI factory), `middleware.py` (tenant-context), `core/_db.py` (pool split), `core/schema.py` (`ensure_all_schemas`/`grant_app_privileges`), `core/queue.py`, `core/outbox.py`, `settings.py` (`llm_provider` discriminator chọn giữa 2 provider thật), `providers/{gemini,openai,fakes}.py`, `obs/{schema,tracing,trace_writer}.py`, `worker/consumer.py` |
 | `apps/web` | — (Vite/TS) | — | mentor (SWE — Thiệu Quang Minh nở UX sau) | — | `src/App.tsx` (React Flow canvas rỗng), `src/main.tsx` |
 
 `evalhub` (không phải `eval`) để tránh shadow builtin Python — comment trong
@@ -261,7 +261,7 @@ thân hàm):
 
 | Protocol | File | Impl WIRED | Impl ĐỂ TRỐNG (spec owner) |
 |---|---|---|---|
-| `LLM` | `protocols.py` | `providers/gemini.py::GeminiProvider` (chỉ `complete`, opt-in qua `STUDIO_USE_FAKE_PROVIDERS=false`+key) + `providers/fakes.py::FakeLLM` (CI-fixture, hash-seeded deterministic) | — |
+| `LLM` | `protocols.py` | `providers/openai.py::OpenAIProvider` (chính, `o4-mini`) + `providers/gemini.py::GeminiProvider` (đường rollback) — cả hai chỉ `complete`, opt-in qua `STUDIO_USE_FAKE_PROVIDERS=false`+key, chọn nhánh qua discriminator `settings.llm_provider` (`build_llm()`, `providers/factory.py`) + `providers/fakes.py::FakeLLM` (CI-fixture, hash-seeded deterministic) | — |
 | `EmbeddingService` | `protocols.py` | `providers/fakes.py::FakeEmbedding` (**CHỈ CI-fixture** — docstring ghi rõ "KHÔNG phải deliverable AIE-1") | Concrete 2-impl (stub-local + gateway) — deliverable graded AIE-1; **stub-local đã ship** (`packages/engine/src/studio_engine/demo_stubs.py::StubEmbedding`, VCR-fixture `packages/engine/tests/fixtures/embedding/`), **gateway impl vẫn không ship trong kit** |
 | `TraceWriter` | `protocols.py` | `obs/trace_writer.py::PgTraceWriter` (1 INSERT thuần vào `obs.trace_events`, cấm cost-aggregation/dedup trong `write()`) | — |
 | `KbSearch` | `kb.py` | — (chỉ seam) | `packages/kb/search.py::KbSearchService.search` — thân `raise NotImplementedError` (spec DE) |
