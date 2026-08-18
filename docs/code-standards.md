@@ -209,5 +209,9 @@ verify: `packages/engine/tests/test_interpreter_contract.py`,
   submodule mà học viên có quyền write). Cài hook này ở mỗi repo. (Phân phối = multi-repo submodule,
   xem `GITFLOWS.md` + `docs/system-architecture.md` §7 — cơ chế subtree-squash-1-repo cũ đã bỏ.)
 - **Secrets qua env, không hardcode** — `Settings` (`apps/studio/src/studio_app/settings.py`,
-  `pydantic-settings`, prefix `STUDIO_`) đọc mọi khoá (Gemini API key, Langfuse keys, 2 DSN) từ
-  `.env`/environment; `.env.example` liệt kê đủ biến, `.env` thật nằm trong `.gitignore`.
+  `pydantic-settings`, prefix `STUDIO_`) đọc mọi khoá (OpenAI API key, Gemini API key, Langfuse keys,
+  2 DSN) từ `.env`/environment; `.env.example` liệt kê đủ biến, `.env` thật nằm trong `.gitignore`.
+- **`llm_provider` discriminator** (`StrEnum` `openai`|`gemini`, `Settings.llm_provider`) — required,
+  KHÔNG có default: thiếu/sai giá trị raise `ValidationError` ngay lúc khởi động, không rơi về nhánh
+  mặc định nào (chọn giữa `OpenAIProvider` chính và `GeminiProvider` rollback, `providers/factory.py::
+  build_llm()`).
