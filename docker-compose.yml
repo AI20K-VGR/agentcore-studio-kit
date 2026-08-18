@@ -41,6 +41,8 @@ services:
       STUDIO_DATABASE_URL: ${STUDIO_DATABASE_URL:-postgresql://studio_app:changeme@postgres:5432/studio}
       STUDIO_DATABASE_URL_ADMIN: ${STUDIO_DATABASE_URL_ADMIN:-postgresql://studio_owner:changeme@postgres:5432/studio}
       STUDIO_GEMINI_API_KEY: ${STUDIO_GEMINI_API_KEY:-changeme}
+      STUDIO_LLM_PROVIDER: ${STUDIO_LLM_PROVIDER:-gemini}
+      STUDIO_OPENAI_API_KEY: ${STUDIO_OPENAI_API_KEY:-changeme}
       STUDIO_ENABLE_TRACING: ${STUDIO_ENABLE_TRACING:-false}
       STUDIO_USE_FAKE_PROVIDERS: ${STUDIO_USE_FAKE_PROVIDERS:-true}
 
