@@ -209,8 +209,10 @@ Publish → Chat), làm theo đúng các bước dưới, đã tự chạy thậ
 # 1. Cài dependency Python + copy env mẫu
 make setup
 cp .env.example .env
-# Sửa .env: STUDIO_JWT_SECRET đổi khỏi "changeme" (bất kỳ chuỗi nào cũng chạy được lúc dev,
-# xem `openssl rand -hex 32` để sinh khoá thật nếu cần dùng nghiêm túc hơn demo).
+# Sửa .env: STUDIO_JWT_SECRET phải >= 32 ký tự (Settings() raise ValidationError lúc khởi động
+# nếu ngắn hơn — vá kit#129 §3.3 mục #3, VinSOC pentest). .env.example đã để sẵn 1 placeholder
+# đủ dài để chạy dev ngay, nhưng KHÔNG dùng nguyên placeholder đó cho môi trường thật — xem
+# `openssl rand -hex 32` để sinh khoá thật.
 
 # 2. Bật Postgres — dùng ĐÚNG dev stack (docker-compose.yml, port 5432, db "studio"), khớp
 # NGUYÊN VẸN giá trị mặc định trong .env.example — không cần sửa STUDIO_DATABASE_URL nào cả.
@@ -228,7 +230,13 @@ uv run python apps/studio/scripts/seed_demo_tenants.py
 # schema (`ensure_all_schemas`) + CẤP QUYỀN DML cho role `studio_app` (`grant_app_privileges`,
 # `app.py:39-40`). PHẢI lên TRƯỚC bước 5: `studio_app` chỉ có quyền INSERT vào `kb.chunks` SAU khi
 # backend boot — chạy ingest trước sẽ gãy `permission denied for schema kb`.
-uv run uvicorn studio_app.app:create_app --factory --app-dir apps/studio/src --host 127.0.0.1 --port 8000 --reload
+# `--no-proxy-headers` (app#18): uvicorn mặc định tự tin `X-Forwarded-For` từ MỌI kết nối tới từ
+# 127.0.0.1 (kể cả `curl localhost` ngay trên máy này) và ghi đè `request.client` TRƯỚC KHI app
+# thấy request — độc lập với `STUDIO_TRUST_X_FORWARDED_FOR`, nên bỏ cờ này thì rate-limit
+# `/api/auth/login` né được bằng cách tự set header giả, không cần chạm gì tới cờ app. CHỈ bỏ cờ
+# này (và bật `STUDIO_TRUST_X_FORWARDED_FOR=true`) khi triển khai THẬT có reverse proxy đáng tin
+# GHI ĐÈ (không nối thêm) `X-Forwarded-For` trước khi tới app.
+uv run uvicorn studio_app.app:create_app --factory --app-dir apps/studio/src --host 127.0.0.1 --port 8000 --reload --no-proxy-headers
 
 # 5. Nạp corpus Callisto vào kb.chunks (42 doc / 140 chunk: ankor 71 · borea 69) — CHẠY TỪ GỐC KIT,
 # cửa sổ terminal riêng, SAU khi backend (bước 4) đã in "Application startup complete". BẮT BUỘC
@@ -247,25 +255,75 @@ npm install
 npm run dev   # mặc định http://127.0.0.1:5173
 ```
 
-Mở `http://127.0.0.1:5173`, đăng nhập bằng 1 trong các email demo sau (không cần mật khẩu —
-`_DEMO_ACCOUNTS`, `apps/studio/src/studio_app/routes/auth.py`, tenant + roles gán sẵn, không tự
-chọn được):
+### Đăng nhập — chỉ còn 1 đường, bằng mật khẩu thật
 
-| Email | Tenant | Roles | Giao diện thấy |
-|---|---|---|---|
-| `admin@ankor.vn` | ankor | `admin, public, hr, finance, engineering` | Đầy đủ — 2 tab Canvas + Chat |
-| `hr@ankor.vn` | ankor | `hr` | Chỉ khung Chat |
-| `finance@ankor.vn` | ankor | `finance` | Chỉ khung Chat |
-| `guest@ankor.vn` | ankor | *(rỗng)* | Chỉ khung Chat, không role nào |
-| `admin@borea.vn` | borea | `admin, public, hr, finance, engineering` | Đầy đủ — 2 tab Canvas + Chat |
-| `nhanvien@borea.vn` | borea | `public, hr` | Chỉ khung Chat |
+`POST /api/auth/demo-login` (đăng nhập chỉ bằng email, không mật khẩu) đã bị **xoá hoàn toàn**
+khỏi `apps/studio/src/studio_app/routes/auth.py`. Không còn bảng tài khoản demo nào để đăng nhập
+ngay — mọi tài khoản (kể cả để tự thử/demo) phải được **tạo trước** qua `core.users` (mật khẩu
+băm bcrypt thật), theo đúng 1 trong 2 cách dưới.
 
-Tài khoản `admin@*` mới thấy canvas kéo thả — dựng DAG, bấm Test (chạy `interpreter` thật, hiện
-trace/cost thật). `admin@*` được gán đủ cả 4 role nội dung (`public/hr/finance/engineering`) nên
-Test ra chunk KB thật, không rỗng — 3 tài khoản còn lại (`hr@*`/`finance@*`/`nhanvien@borea.vn`)
-không thấy canvas nên chỉ thử qua khung Chat. Rồi Publish (tự chạy `EvalHarness` trên nguyên golden-set + gate trong 1 lần
-bấm). `Publish` hiện tại LUÔN trả 409 (`recipe_hash is None`) cho tới khi AIE-2 xong producer
-(DEC-03, xem kit#127) — đây là hành vi ĐÚNG mong đợi của hệ thống, không phải bug môi trường.
+**Cách A — bootstrap superadmin rồi tự tạo công ty MỚI qua UI** (công ty trống, không có sẵn corpus
+Callisto — dùng để thử luồng quản trị, không dùng để thử canvas/chat có nội dung thật):
+
+```bash
+export STUDIO_DATABASE_URL_ADMIN=postgresql://studio_owner:changeme@localhost:5432/studio
+export STUDIO_DATABASE_URL=postgresql://studio_app:changeme@localhost:5432/studio
+export STUDIO_SUPERADMIN_EMAIL=superadmin@agentcore.internal
+export STUDIO_SUPERADMIN_PASSWORD=<mật khẩu tự chọn, tối thiểu 8 ký tự>
+uv run python apps/studio/scripts/seed_superadmin.py
+```
+
+Đăng nhập bằng `STUDIO_SUPERADMIN_EMAIL`/`STUDIO_SUPERADMIN_PASSWORD` ở `http://127.0.0.1:5173` —
+màn hình DUY NHẤT của superadmin là "Tạo công ty mới" (`POST /api/admin/companies`). Tạo xong,
+đăng xuất rồi đăng nhập bằng email/mật khẩu admin vừa tạo — tài khoản đó có tab "Quản trị" để tự
+tạo thêm nhân viên (`POST /api/admin/users`, chọn roles qua checkbox).
+
+**Cách B — gán tài khoản thật vào tenant `ankor`/`borea` đã seed sẵn** (có ngay corpus Callisto
+71/69 chunk từ bước 5 — dùng cách này nếu muốn thử canvas/chat ra nội dung thật). `create_company`
+LUÔN tạo tenant MỚI (UUID ngẫu nhiên), không có route nào gắn thẳng vào 1 trong 2 tenant có sẵn
+này — chèn thẳng 1 dòng `core.users` bằng script nhỏ:
+
+```bash
+# Chạy từ apps/studio (`uv run python` cần thấy được package `studio_app`).
+cd apps/studio
+uv run python - <<'PY'
+import asyncio, sys
+# Windows: psycopg async từ chối ProactorEventLoop mặc định — cùng workaround
+# apps/studio/tests/conftest.py và scripts/seed_superadmin.py đã dùng. Không cần trên Linux/macOS.
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+from studio_app.jwt_auth import hash_password
+from studio_app.core._db import get_admin_pool, close_pools
+
+ANKOR_ID = "a0000000-0000-0000-0000-000000000001"  # packages/workbench/src/studio_workbench/builder.py
+
+async def main() -> None:
+    pool = await get_admin_pool()
+    async with pool.connection() as conn:
+        await conn.execute(
+            "INSERT INTO core.users (tenant_id, email, password_hash, roles) VALUES (%s, %s, %s, %s) "
+            "ON CONFLICT (email) DO NOTHING",
+            (ANKOR_ID, "admin@ankor.vn", hash_password("doi-mat-khau-nay-truoc-khi-dung-that"), ["admin", "public", "hr", "finance", "engineering"]),
+        )
+    await close_pools()
+
+asyncio.run(main())
+PY
+```
+
+Đăng nhập bằng `admin@ankor.vn` / mật khẩu vừa đặt — canvas thấy đủ, Test ra chunk KB thật (không
+rỗng, vì role có đủ cả 4 role nội dung). Cùng cách này, đổi `ANKOR_ID`/email/roles để tạo tài khoản
+chỉ có 1 role nội dung (thử ca "chỉ thấy Chat, không thấy canvas" — role thiếu `"admin"`).
+
+Rồi Publish (tự chạy `EvalHarness` trên nguyên golden-set + gate trong 1 lần bấm).
+
+**`recipe_hash` (DEC-03) giờ có producer thật** — `studio_workbench.publish.recipe_hash()`, đang
+chờ merge ở [`agentcore-studio-workbench#27`](https://github.com/AI20K-VGR/agentcore-studio-workbench/pull/27)
+(SAU đó nối vào `apps/studio` ở 1 PR riêng, xem PR đó để biết số). **Tới khi CẢ HAI merge**, `Publish`
+vẫn LUÔN trả 409 (`recipe_hash is None`) — đây là hành vi ĐÚNG mong đợi của hệ thống với code hiện
+tại trên `main`, không phải bug môi trường. Sau khi merge xong, `Publish` chỉ còn 409 khi
+`gate.verdict == "FAIL"` thật (agent chưa đạt ngưỡng), không còn LUÔN 409 vô điều kiện nữa.
 
 ## CI + branch protection (F16)
 
