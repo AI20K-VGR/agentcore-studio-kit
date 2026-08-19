@@ -169,15 +169,21 @@ jobs:
       # (apps/studio/routes/publish.py) đi ngược 3 cấp từ `studio_kb.__file__` — đúng ở editable
       # install, đi lố khỏi site-packages trong image → `/evaluate` + `/publish` luôn 400.
       #
-      # Bước này `docker run` CHÍNH image vừa build, import thật module đó trong site-packages
-      # thật của image, assert thư mục golden-set tồn tại — bắt cả LỚP lỗi "chỉ đúng ở layout
-      # dev", không riêng ca `_GOLDEN_SET_DIR`. Không cần Postgres/env: mọi `get_settings()`
-      # trong chain import của publish.py (`core/_db.py`, `providers/factory.py`) gọi lazy BÊN
-      # TRONG hàm, không có ở module scope — import trần không chạm `Settings()`.
-      - name: Smoke-run image — import thật publish.py trong layout đã đóng gói (kit#181)
+      # Bước này `docker run` CHÍNH image vừa build, gọi `create_app()` thật trong site-packages
+      # thật của image (phủ 7 router, không chỉ `publish`), rồi assert thư mục golden-set tồn
+      # tại — bắt lỗi CẤP-IMPORT trên toàn bộ app + đúng ca `_GOLDEN_SET_DIR`. KHÔNG bắt được
+      # hằng số path chỉ tính sai và chỉ nổ lúc được GỌI (không phải lúc import) — review PR#187
+      # đo thấy 2 ca cùng hình dạng còn lọt qua đường này: `studio_kb.doc_factory.DEFAULT_DOC_DIR`
+      # và `studio_engine.demo_stubs._ENGINE_ROOT`/`_FIXTURES_DIR`; chưa chạm production hôm nay
+      # (route thật dùng `PgKbSearch`/`build_llm()`, không dùng 2 stub đó) nên để riêng, không
+      # phình phạm vi PR này. Không cần Postgres/env: `create_app()` chỉ đăng ký lifespan, DDL
+      # thật chạy trong `_lifespan` lúc ASGI server start — gọi hàm suông không chạm `Settings()`.
+      - name: Smoke-run image — create_app() thật trong layout đã đóng gói (kit#181)
         run: |
-          docker run --rm --entrypoint python studio-kit:ci -c "
+          docker run --rm --entrypoint python studio-kit:ci - <<'PY'
+          from studio_app.app import create_app
           from studio_app.routes.publish import _GOLDEN_SET_DIR
           assert _GOLDEN_SET_DIR.is_dir(), f'_GOLDEN_SET_DIR không tồn tại trong image: {_GOLDEN_SET_DIR} (kit#181)'
-          print(f'OK: _GOLDEN_SET_DIR = {_GOLDEN_SET_DIR}')
-          "
+          app = create_app()
+          print(f'OK: _GOLDEN_SET_DIR = {_GOLDEN_SET_DIR}, routes = {len(app.routes)}')
+          PY
