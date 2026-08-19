@@ -163,3 +163,21 @@ jobs:
         with:
           pat: ${{ secrets.PAT }}
       - run: docker build -t studio-kit:ci .
+      # Điểm mù kit#181: job này BUILD image rồi DỪNG — chưa bước nào từng `docker run` nó, nên
+      # bất kỳ lỗi chỉ lộ ra ở layout runtime thật (`--no-editable`, không còn `src/`, phẳng hơn
+      # workspace dev 1 cấp) lọt qua toàn bộ CI. Ca cụ thể đã xảy ra: `_GOLDEN_SET_DIR`
+      # (apps/studio/routes/publish.py) đi ngược 3 cấp từ `studio_kb.__file__` — đúng ở editable
+      # install, đi lố khỏi site-packages trong image → `/evaluate` + `/publish` luôn 400.
+      #
+      # Bước này `docker run` CHÍNH image vừa build, import thật module đó trong site-packages
+      # thật của image, assert thư mục golden-set tồn tại — bắt cả LỚP lỗi "chỉ đúng ở layout
+      # dev", không riêng ca `_GOLDEN_SET_DIR`. Không cần Postgres/env: mọi `get_settings()`
+      # trong chain import của publish.py (`core/_db.py`, `providers/factory.py`) gọi lazy BÊN
+      # TRONG hàm, không có ở module scope — import trần không chạm `Settings()`.
+      - name: Smoke-run image — import thật publish.py trong layout đã đóng gói (kit#181)
+        run: |
+          docker run --rm --entrypoint python studio-kit:ci -c "
+          from studio_app.routes.publish import _GOLDEN_SET_DIR
+          assert _GOLDEN_SET_DIR.is_dir(), f'_GOLDEN_SET_DIR không tồn tại trong image: {_GOLDEN_SET_DIR} (kit#181)'
+          print(f'OK: _GOLDEN_SET_DIR = {_GOLDEN_SET_DIR}')
+          "
