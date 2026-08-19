@@ -318,12 +318,14 @@ chỉ có 1 role nội dung (thử ca "chỉ thấy Chat, không thấy canvas" 
 
 Rồi Publish (tự chạy `EvalHarness` trên nguyên golden-set + gate trong 1 lần bấm).
 
-**`recipe_hash` (DEC-03) giờ có producer thật** — `studio_workbench.publish.recipe_hash()`, đang
-chờ merge ở [`agentcore-studio-workbench#27`](https://github.com/AI20K-VGR/agentcore-studio-workbench/pull/27)
-(SAU đó nối vào `apps/studio` ở 1 PR riêng, xem PR đó để biết số). **Tới khi CẢ HAI merge**, `Publish`
-vẫn LUÔN trả 409 (`recipe_hash is None`) — đây là hành vi ĐÚNG mong đợi của hệ thống với code hiện
-tại trên `main`, không phải bug môi trường. Sau khi merge xong, `Publish` chỉ còn 409 khi
-`gate.verdict == "FAIL"` thật (agent chưa đạt ngưỡng), không còn LUÔN 409 vô điều kiện nữa.
+**`recipe_hash` (DEC-03) đã có producer thật VÀ đã được nối vào đường publish** — producer
+`studio_workbench.publish.recipe_hash()` merge ở
+[`agentcore-studio-workbench#27`](https://github.com/AI20K-VGR/agentcore-studio-workbench/pull/27),
+call-site merge ở [`agentcore-studio-app#26`](https://github.com/AI20K-VGR/agentcore-studio-app/pull/26):
+`_evaluate` truyền `recipe=` vào `EngineAgentRunner` (nên recipe được CHẤM đúng là recipe được
+PUBLISH — đóng kit#127) rồi truyền `recipe_hash=recipe_hash(recipe)` vào `EvalHarness.run()`.
+⇒ `Publish` **không còn LUÔN trả 409**. 409 giờ chỉ còn nghĩa `gate.verdict == "FAIL"` thật (agent
+chưa đạt ngưỡng) hoặc `scorecard.recipe_hash` lệch với recipe đang publish.
 
 ## CI + branch protection (F16)
 
