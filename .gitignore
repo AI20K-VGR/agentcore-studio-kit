@@ -10,3 +10,6 @@ dist/
 .ruff_cache/
 .import_linter_cache/
 .backlog_register.lock
+
+# `LLMJudge` cap/cache state khi dev override về repo-local (`apps/studio#20`).
+state/
