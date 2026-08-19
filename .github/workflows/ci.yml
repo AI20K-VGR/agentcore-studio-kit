@@ -178,9 +178,14 @@ jobs:
       # (route thật dùng `PgKbSearch`/`build_llm()`, không dùng 2 stub đó) nên để riêng, không
       # phình phạm vi PR này. Không cần Postgres/env: `create_app()` chỉ đăng ký lifespan, DDL
       # thật chạy trong `_lifespan` lúc ASGI server start — gọi hàm suông không chạm `Settings()`.
+      #
+      # `-i` KHÔNG được bỏ: `docker run` không có `-i` thì container nhận stdin đã đóng (runner CI
+      # không có TTY) — `python -` khi đó chạy 0 dòng script, exit 0 NGAY, và bước này biến thành
+      # always-green vô điều kiện (đã tự bắt lỗi này ở lần push trước: log không có dòng `OK: ...`
+      # nào dù job báo pass). `-i` giữ stdin mở để heredoc thật sự tới được `python -`.
       - name: Smoke-run image — create_app() thật trong layout đã đóng gói (kit#181)
         run: |
-          docker run --rm --entrypoint python studio-kit:ci - <<'PY'
+          docker run --rm -i --entrypoint python studio-kit:ci - <<'PY'
           from studio_app.app import create_app
           from studio_app.routes.publish import _GOLDEN_SET_DIR
           assert _GOLDEN_SET_DIR.is_dir(), f'_GOLDEN_SET_DIR không tồn tại trong image: {_GOLDEN_SET_DIR} (kit#181)'
