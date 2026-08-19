@@ -28,7 +28,7 @@ con trỏ submodule đã ghi, hiện đang cũ — một file test import engine
 | trace | `TraceEvent` thật do interpreter emit | contracts + engine |
 | eval | `EvalHarness.run_smoke` + `score_case` | evalhub (AIE-2) |
 
-Golden-set đọc **thẳng từ `packages/kb/golden/smoke-10.yaml`** (`callisto-smoke-10-v0`, 10 case),
+Golden-set đọc **thẳng từ `packages/kb/src/studio_kb/golden/smoke-10.yaml`** (`callisto-smoke-10-v0`, 10 case),
 không chép tay — bản chép in-code ở
 `studio_evalhub/cli.py::_demo_golden_set` là nguồn sự thật thứ hai, sửa YAML mà quên sửa nó thì lệch
 im lặng. Script này không có vấn đề đó.
@@ -70,7 +70,9 @@ from studio_workbench import create_recipe_d6
 from studio_workbench.tenant_wall import resolve_session
 
 _ROOT = Path(__file__).resolve().parent.parent
-_GOLDEN = _ROOT / "packages" / "kb" / "golden" / "smoke-10.yaml"
+# `kb#37`/`kit#181`: `golden/` dời vào trong `src/studio_kb/` để đóng gói được vào wheel —
+# đường workspace vì thế dài thêm 2 cấp. Cùng phép sửa như `app#29`, `engine#28`.
+_GOLDEN = _ROOT / "packages" / "kb" / "src" / "studio_kb" / "golden" / "smoke-10.yaml"
 _AGENT_ID = "agent-callisto-d6"
 
 
