@@ -54,6 +54,15 @@ services:
       STUDIO_OPENAI_API_KEY: ${STUDIO_OPENAI_API_KEY:-changeme}
       STUDIO_ENABLE_TRACING: ${STUDIO_ENABLE_TRACING:-false}
       STUDIO_USE_FAKE_PROVIDERS: ${STUDIO_USE_FAKE_PROVIDERS:-true}
+    # `LLMJudge` cap/cache (`apps/studio#20`) — service này trước đây KHÔNG có `volumes:` nào, khác
+    # postgres/redis/clickhouse/minio. Toàn bộ FS container là writable layer tạm ⇒ mỗi
+    # `up -d --build` (hoặc `down && up`) mất `judge-cap.json` ⇒ cap ≤100/NGÀY (`INV-4`) reset về 0
+    # giữa ngày. Đúng lớp lỗi mà counter-trong-file sinh ra để chặn (`judge.py`: *"counter RAM reset
+    # mỗi lần khởi động ⇒ chạy 5 lần trong ngày là cap thật ≤500"*), chỉ đổi từ "khởi động lại tiến
+    # trình" sang "redeploy". `cache` mất thì chỉ tốn lại tiền gọi LLM; `cap` mất là mất hàng rào.
+    # Đường mount khớp đúng default 2 field `Settings` (`/app/state/...`, `/app` là `WORKDIR`).
+    volumes:
+      - studio_judge_state:/app/state
 
   # --- obs profile: Langfuse self-host cluster (R-DI §6 COPY-READY #21 — redis/clickhouse/minio
   # serve Langfuse ONLY; this kit's own queue/store/blob stay Postgres-everything, Decision #2). ---
@@ -120,6 +129,7 @@ services:
       CLICKHOUSE_PASSWORD: ${STUDIO_CLICKHOUSE_PASSWORD:-changeme}
 
 volumes:
+  studio_judge_state:
   studio_pgdata:
   studio_redis_data:
   studio_clickhouse_data:
