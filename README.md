@@ -226,6 +226,28 @@ docker compose up -d
 # `.env` theo thư mục đang đứng (CWD) khi lệnh chạy, không theo vị trí file script.
 uv run python apps/studio/scripts/seed_demo_tenants.py
 
+# 3b. CHỈ KHI demo bằng provider THẬT (bắt buộc nếu muốn "Chấm điểm" ra số có nghĩa). Mặc định
+# `.env.example` để `STUDIO_USE_FAKE_PROVIDERS=true` ⇒ LLM và embedding đều là stub: luồng chạy
+# hết, nhưng điểm KHÔNG nói gì về chất lượng thật. Bốn biến dưới đây, thiếu bất kỳ cái nào là
+# hỏng giữa demo (cả bốn đã dựng lại được ở tổng duyệt 20/08):
+#
+#   STUDIO_USE_FAKE_PROVIDERS=false
+#   STUDIO_OPENAI_API_KEY=sk-...          # LLM trả lời + LLM-judge
+#   STUDIO_OPENROUTER_API_KEY=sk-or-...   # embedding (gemini-embedding-001 @2048); thiếu ⇒ 503
+#   STUDIO_JUDGE_CACHE_PATH / STUDIO_JUDGE_CAP_PATH  → đường GHI ĐƯỢC trên máy
+#
+# Hai biến judge: mặc định trong code là `/app/state/...` (đúng cho image, sai cho máy thật) —
+# chạy ngoài container mà không override thì lần gọi judge ĐẦU TIÊN ném `PermissionError` thành
+# 500. `.env.example` đã có sẵn 2 dòng, chỉ cần đổi sang đường trong repo/nhà bạn.
+#
+# KHÔNG cần set `STUDIO_OPENAI_MODEL`: bỏ trống = `gpt-4o-mini`, model duy nhất đo được là PASS
+# (`evalhub#31`: 0.9889 / 1.0000 · PASS 3/3; `o4-mini` cho 0.7556 · FAIL 3/3).
+#
+# Quota judge là 100 call/NGÀY (`LLMJudge` cap, đếm trong file `STUDIO_JUDGE_CAP_PATH`). Một lượt
+# "Chấm điểm" 30 case tiêu 8–16 call ⇒ khoảng 6–9 lượt/ngày. Hết quota thì judge tụt nấc
+# exact-match, điểm rơi từ ~0.93 xuống ~0.70 và verdict thành FAIL — tín hiệu duy nhất là một
+# dòng log. Trước buổi demo: xoá file cap đó cho quota về 0.
+
 # 4. Chạy backend (apps/studio) — cửa sổ terminal riêng. Lần khởi động này chạy lifespan = dựng
 # schema (`ensure_all_schemas`) + CẤP QUYỀN DML cho role `studio_app` (`grant_app_privileges`,
 # `app.py:39-40`). PHẢI lên TRƯỚC bước 5: `studio_app` chỉ có quyền INSERT vào `kb.chunks` SAU khi
@@ -238,7 +260,7 @@ uv run python apps/studio/scripts/seed_demo_tenants.py
 # GHI ĐÈ (không nối thêm) `X-Forwarded-For` trước khi tới app.
 uv run uvicorn studio_app.app:create_app --factory --app-dir apps/studio/src --host 127.0.0.1 --port 8000 --reload --no-proxy-headers
 
-# 5. Nạp corpus Callisto vào kb.chunks (42 doc / 140 chunk: ankor 71 · borea 69) — CHẠY TỪ GỐC KIT,
+# 5. Nạp corpus Callisto **2.0** vào kb.chunks (80 doc / 800 chunk: ankor 400 · borea 400) — CHẠY TỪ GỐC KIT,
 # cửa sổ terminal riêng, SAU khi backend (bước 4) đã in "Application startup complete". BẮT BUỘC
 # trước khi demo chat/retrieval. Sau mỗi lần `make test`/`pytest` (fixture truncate `kb.chunks` +
 # `core.tenants`) chỉ cần chạy lại BƯỚC 3 + 5 — KHÔNG phải restart backend (truncate xoá dòng, không
@@ -247,7 +269,14 @@ uv run uvicorn studio_app.app:create_app --factory --app-dir apps/studio/src --h
 # dev-stack DSN dưới đây; KHỚP NGUYÊN VẸN .env.example, role non-owner `studio_app` để RLS WITH CHECK
 # còn cắn. Idempotent — chạy lại không nhân đôi.
 export STUDIO_DATABASE_URL=postgresql://studio_app:changeme@localhost:5432/studio
-uv run python packages/kb/scripts/ingest_callisto.py
+uv run python packages/kb/scripts/ingest_callisto_v2.py
+
+# ⚠️ ĐÚNG script là `..._v2.py`. Bản 1.0 (`ingest_callisto.py`) nạp corpus 140 chunk bằng bộ nhúng
+# bag-of-words; sau cutover 2.0 (`kb#43`) cột là `vector(2048)` và đường truy vấn nhúng bằng
+# `gemini-embedding-001` — dùng script 1.0 thì corpus và query nằm ở HAI không gian vector khác
+# nhau: `recall@3` rơi từ 22/22 xuống 1/22 (đo được), agent trả lời trôi chảy từ chunk sai hoặc từ
+# chối mọi câu, và KHÔNG lỗi nào nổ. `..._v2.py` đọc vector từ cache đã commit nên KHÔNG cần API key.
+# Kiểm sau khi nạp:  select count(*), vector_dims(embedding) from kb.chunks;  →  800 | 2048
 
 # 6. Chạy frontend (apps/web) — cửa sổ terminal riêng
 cd apps/web
