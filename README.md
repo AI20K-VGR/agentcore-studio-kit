@@ -388,5 +388,5 @@ and no code here substitutes for checking it once the repo exists on GitHub.
 Kit được tách thành **1 repo cha + 6 submodule** (mỗi domain 1 repo private, ranh giới quyền cứng ở
 tầng git). CODEOWNERS đã gỡ. Quy trình đầy đủ: **`GITFLOWS.md`**.
 
-(Fallback tooling cho mentor ở Tuần 0 — collapse về 1 root `pyproject.toml` nếu per-package
-`uv`/mypy/IDE tốn quá nhiều thời gian — xem `docs/ONBOARDING.md`.)
+(Fallback tooling cho mentor ở Tuần 0, "Hướng A" — collapse về 1 root `pyproject.toml` nếu
+per-package `uv`/mypy/IDE tốn quá nhiều thời gian — chi tiết ở `docs/ONBOARDING.md`.)
