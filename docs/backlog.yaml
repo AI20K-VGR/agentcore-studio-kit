@@ -1,0 +1,18 @@
+- id: BL-001
+  text: apps/studio PR#27 (feat/documents-upload-flow) adds python-multipart to pyproject.toml but kit-root uv.lock has 0 hits for it -- uv sync --frozen (Docker path) will fail to install/start; CI stays green only because uv run self-heals the missing package silently. Needs companion 'uv lock' commit in kit repo before PR#27/PR#8 are deploy-safe. Same failure class as kit#181.
+  type: bug
+  priority: P1
+  status: open
+  created_ts: '2026-08-19T10:38:00.883797+00:00'
+  done_ts: ''
+  source_ref: ''
+  actor: user:tranbadat26072004@gmail.com
+- id: BL-002
+  text: 'FROZEN-READY doc sai: packages/engine/docs/contracts/embedding-service.v0.md:80 khẳng định quên đồng bộ EMBEDDING_DIM thì test_embedding_service_contract.py ''đỏ ở một dòng assert''. SAI — EXPECTED_DIM = 8 ở test đó (tests/test_embedding_service_contract.py:29) là literal KHAI LẠI, không import từ studio_kb (comment :25-26 nói rõ lý do: .importlinter cấm studio_engine chạm studio_kb). Assert :71 so StubEmbedding/EmptyEmbedding (engine-local) với literal engine-local => vòng kín, mù với giá trị thật của kb. kb#43 đổi 8->2048 KHÔNG làm nó đỏ. Thêm một chỗ cũ nữa: doc :74 dẫn ''schema.py:33, hiện 8'' — nay hằng số ở schema.py:42 và bằng 2048. Doc FROZEN-READY do chính AIE-1 chấp bút => cần mini-RFC + chữ ký theo luật của chính doc đó, KHÔNG sửa lặng.'
+  type: doc-correction
+  priority: P2
+  status: open
+  created_ts: '2026-08-19T17:27:54.605661+00:00'
+  done_ts: ''
+  source_ref: app#30 / plans/260820-0000-app30-real-embedding-gateway
+  actor: user:tranbadat26072004@gmail.com
