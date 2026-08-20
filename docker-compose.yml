@@ -54,6 +54,29 @@ services:
       STUDIO_OPENAI_API_KEY: ${STUDIO_OPENAI_API_KEY:-changeme}
       STUDIO_ENABLE_TRACING: ${STUDIO_ENABLE_TRACING:-false}
       STUDIO_USE_FAKE_PROVIDERS: ${STUDIO_USE_FAKE_PROVIDERS:-true}
+      # kit#195 tầng 1 — biến này THIẾU trước bản vá: image không `ENV STUDIO_*` nào và không
+      # `COPY .env` (Dockerfile), nên `Settings.jwt_secret` (required-no-default, kit#129 §3.3 —
+      # VinSOC pentest, cùng khuôn `STUDIO_LLM_PROVIDER` ở trên) không có nguồn nào ⇒
+      # `docker compose --profile app up -d` chết ngay lúc khởi động với
+      # `ValidationError: jwt_secret Field required`, bất kể `.env` ở host có khai đủ hay không.
+      # Dùng `:?` (fail ồn ngay ở compose), KHÔNG `:-` với default: một default ở tầng compose sẽ
+      # che mất đúng chủ ý required-no-default của `Settings` (đo trên `main@ea7bbbe`,
+      # `apps/studio@495bcfb`).
+      STUDIO_JWT_SECRET: ${STUDIO_JWT_SECRET:?set STUDIO_JWT_SECRET (>=32 ký tự) trong .env}
+      # kit#195 tầng 2 — 3 biến provider này bị compose NUỐT CÂM trước bản vá: không khai trong
+      # `environment:` thì `${...}` trong `.env` không bao giờ tới process, dù người dựng máy demo
+      # đã điền key đầy đủ (đo bằng `docker compose --env-file proof.env --profile app config` —
+      # xuất ra thiếu đúng 3 dòng này). Hậu quả với `STUDIO_USE_FAKE_PROVIDERS=false`:
+      # `build_embedding()` (`providers/factory.py`) không thấy `openrouter_api_key` ⇒ 503 câm ở cả
+      # `/evaluate` lẫn `/chat`, không đầu mối nào chỉ về compose.
+      #
+      # CHỦ Ý bỏ `STUDIO_OPENAI_BASE_URL` khỏi danh sách dưới: `${STUDIO_OPENAI_BASE_URL:-}` rỗng
+      # KHÔNG phải `None` — `AsyncOpenAI(base_url="")` (`providers/openai.py`) chết
+      # `APIConnectionError`, đúng bẫy tài liệu đã ghi ở `#193`. Ai cần trỏ OpenRouter/gateway khác
+      # qua đường container: set thẳng trong `environment:` của service này khi cần, đừng thêm lại
+      # dòng `:-` rỗng ở đây.
+      STUDIO_OPENROUTER_API_KEY: ${STUDIO_OPENROUTER_API_KEY:-}
+      STUDIO_OPENAI_MODEL: ${STUDIO_OPENAI_MODEL:-}
     # `LLMJudge` cap/cache (`apps/studio#20`) — service này trước đây KHÔNG có `volumes:` nào, khác
     # postgres/redis/clickhouse/minio. Toàn bộ FS container là writable layer tạm ⇒ mỗi
     # `up -d --build` (hoặc `down && up`) mất `judge-cap.json` ⇒ cap ≤100/NGÀY (`INV-4`) reset về 0
