@@ -307,9 +307,66 @@ PY
 rỗng, vì role có đủ cả 4 role nội dung). Cùng cách này, đổi `ANKOR_ID`/email/roles để tạo tài khoản
 chỉ có 1 role nội dung (thử ca "chỉ thấy Chat, không thấy canvas" — role thiếu `"admin"`).
 
-Rồi Publish (tự chạy `EvalHarness` trên nguyên golden-set + gate trong 1 lần bấm). `Publish` trả
-`409` chỉ khi `gate.verdict == "FAIL"` thật (agent chưa đạt ngưỡng) hoặc `scorecard.recipe_hash`
-lệch với recipe đang publish — không phải luôn-409.
+### Dựng recipe trên canvas
+
+Admin đăng nhập vào thẳng tab **Canvas**. Tab này mở ra đã có sẵn 1 khung agent
+`agent-callisto-d12` với DAG mẫu 4 node (`kb-retrieve → llm-step → tool-call → end`) và
+`golden_set_ref: callisto-2.0-golden-30-v1` — khớp đúng corpus vừa nạp ở bước 5, dùng luôn để đi
+hết luồng mà không cần vẽ tay. Sidebar phải báo "graph-lint: 7/7 luật sạch" khi recipe hợp lệ.
+
+Muốn tự dựng agent mới: bấm **"Tạo agent"** (cột trái) → đặt tên → kéo node từ Palette vào canvas
+(6 loại đóng: KB Retrieve, LLM Step, Condition, Tool Call, HITL Pause, End) → nối cạnh bằng kéo
+chuột giữa 2 handle → bấm đúp 1 node để sửa param (`query`/`top_k`/`section_roles` cho KB Retrieve,
+`temperature` cho LLM Step, `tool` cho Tool Call…), bấm đúp 1 cạnh để sửa `when`. Bấm đúp thanh
+tiêu đề khung mở **"Cấu hình Agent"**: Định danh (`agent_id`/`instructions`/`model`), Tool
+whitelist, KB Binding (`kb_id` + section scope), Eval Gate (`golden_set_ref` + ngưỡng
+`success`/`citation_accuracy`). graph-lint fail-closed — Test/Publish khoá cứng tới khi đủ 7 luật:
+6 loại node · cạnh có đích · 1 start node · ≤1 cạnh ra mỗi node · không chu trình · kết ở `end` ·
+tool nằm trong whitelist.
+
+### Chạy — Test → xem trace
+
+Sidebar phải, mục **Playground**, bấm **Test** (khoá nếu graph-lint đỏ) → `POST /api/runs`,
+interpreter chạy DAG thật, rồi UI tự `GET /api/runs/{run_id}` lại bằng 1 request TÁCH RIÊNG (không
+tin thẳng response POST) để chứng minh trace ghi đúng — hiện `TraceViewer`: từng event theo đúng
+thứ tự dispatch, có `node_type`/`node_id`/timestamp/`tokens {prompt, completion}`/citations/
+outputs, cộng dòng tổng `Σtokens=…`.
+
+**Trung thực:** `cost` mỗi event hiện LUÔN in "chưa đo" — `interpreter.py` chưa có nguồn cost thật
+(cost-lineage còn mở, kit#120). `tokens` là số thật, `cost` thì chưa wire — đừng báo cáo cost như
+đã đo.
+
+### Chấm điểm → Publish
+
+Mục **Chấm điểm**, bấm nút cùng tên → `POST /api/agents/{agent_id}/evaluate`, chạy nguyên
+`golden_set_ref` qua `EvalHarness` thật, hiện `verdict`/`success_rate`/`citation_accuracy` — CHƯA
+publish, chỉ xem điểm trước. Nút **Publish** chỉ **sáng** khi lần Chấm điểm gần nhất `verdict=PASS`
+cho ĐÚNG recipe đang có trên canvas (đổi bất cứ gì sau khi chấm điểm làm nút tắt lại — phải chấm
+lại). Bấm Publish gọi `POST /api/agents/{agent_id}/publish` — server tự chấm lại từ đầu (không tin
+điểm client) rồi gate thật; kết quả `published` (kèm nút "Sang tab Chat để thử") hoặc `blocked`
+(HTTP 409, kèm lý do + scorecard, nút "Sang tab Rollback"). `409` chỉ khi `gate.verdict == "FAIL"`
+thật hoặc `scorecard.recipe_hash` lệch với recipe đang publish — không phải luôn-409.
+
+Cách chắc ăn nhất để tự thấy nhánh **chặn**: sửa 2 ngưỡng `success`/`citation_accuracy` trong "Cấu
+hình Agent" lên gần 1.0 trước khi Chấm điểm — verdict FAIL gần như chắc chắn với model thật, nút
+Publish khoá lại ngay trên UI (không cần round-trip server mới thấy bị chặn). **Rollback thật** nằm
+ở tab "Agent đã publish": chọn agent → chọn version cũ ở dropdown → bấm **Rollback**
+(`POST /api/agents/{agent_id}/rollback`) — cần đã publish ≥2 version mới có gì để rollback về.
+*[CHƯA TỰ CHẠY SỐNG nhánh block+rollback để xác nhận — tự tay thử qua 1 lượt trước khi đưa vào
+evidence-pack Gate-3, đừng tin nguyên văn đoạn này.]*
+
+### Dùng — chat với agent đã publish
+
+Tab **"Dùng thử"** (icon chat) — dropdown chọn agent đã publish (tên hiển thị dạng đọc được, vd
+"Agent callisto d12"; giá trị gửi lên server vẫn là `agent_id` slug gốc). Admin thấy thêm khối
+"Test agent với role" (checkbox theo phòng ban, mặc định tick hết) để tự thu hẹp role trước khi
+hỏi — dùng đúng ô này làm phép fence-proof: bỏ tick phòng ban/tenant kia, hỏi 1 câu chỉ dữ liệu
+phòng ban đó mới có — kỳ vọng agent từ chối hoặc không trả lời đúng. Gõ câu hỏi → **Gửi** →
+`POST /api/agents/{agent_id}/chat`; trả lời kèm badge version, citation (nếu có), và nút "Xem
+trace" mở lại đúng `TraceViewer` của lượt chat đó qua `run_id` riêng của lượt đó.
+
+Tài khoản chỉ có role nội dung (thiếu `"admin"`, xem cách tạo ở trên) đăng nhập vào thẳng màn hình
+chat toàn màn hình này, không thấy tab nào khác — đúng hành vi "employee chỉ dùng, không xây".
 
 ## CI + branch protection (F16)
 
@@ -326,12 +383,10 @@ deliberately leave `leak-test` OUT of that list. This is a manual repo-settings 
 Branches → branch protection rule → required status checks) — nothing in this kit automates it,
 and no code here substitutes for checking it once the repo exists on GitHub.
 
-## Fallback (Hướng A)
+## Phân phối repo & phân quyền
 
-If per-package `uv`/mypy/IDE tooling costs the mentor too much time in week 0, the directory tree
-can stay exactly as-is while collapsing to a single root `pyproject.toml` (Hướng A) — the ownership
-boundary (packaging + CI-per-package + **per-repo permission** + schema-per-quadrant) still holds
-without a true workspace. Not the default; documented here as an explicit escape hatch.
+Kit được tách thành **1 repo cha + 6 submodule** (mỗi domain 1 repo private, ranh giới quyền cứng ở
+tầng git). CODEOWNERS đã gỡ. Quy trình đầy đủ: **`GITFLOWS.md`**.
 
-> **Phân phối repo & phân quyền:** kit được tách thành **1 repo cha + 6 submodule** (mỗi domain 1
-> repo private, ranh giới quyền cứng ở tầng git). CODEOWNERS đã gỡ. Quy trình đầy đủ: **`GITFLOWS.md`**.
+(Fallback tooling cho mentor ở Tuần 0 — collapse về 1 root `pyproject.toml` nếu per-package
+`uv`/mypy/IDE tốn quá nhiều thời gian — xem `docs/ONBOARDING.md`.)
