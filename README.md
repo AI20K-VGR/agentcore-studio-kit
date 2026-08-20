@@ -6,25 +6,7 @@ engineers (DE · SWE · AIE-1 · AIE-2) build an AI-agent authoring tool end to 
 
 Infra (Docker/Postgres/CI/contracts/RLS/queue/OTel) is WIRE — it runs Day-1. Business logic in the
 4 quadrant packages is intentionally TRÔNG (`Protocol` + `NotImplementedError` + a RED acceptance
-test = the spec each engineer fills in). See `plans/260717-1516-studio-kit-template/plan.md` for
-the full decision record.
-
-## Setup
-
-```bash
-make setup    # uv sync — one venv, one lockfile, all 6 Python members resolved
-cp .env.example .env   # fill in real DSNs/keys
-```
-
-Requires `uv >=0.11` and network access on first `uv sync` (real PyPI deps, no vendoring).
-
-## Dev loop
-
-```bash
-make dev        # docker compose up -d (default profile — Postgres, wired in P3/P9)
-make test       # uv run pytest — full workspace suite
-make lint       # ruff check . && mypy strict (packages + apps) && lint-imports (layers-contract)
-```
+test = the spec each engineer fills in). See `docs/decisions/README.md` for the full decision record.
 
 ## Workspace layout
 
@@ -152,8 +134,7 @@ needs the mentor-approval rule (see `packages/contracts/`).
   | **AIE-1 — Trần Bá Đạt** | `packages/engine` (`studio_engine`) | Interpreter, 6 node executors, `EmbeddingService` 2-impl, fence-EXECUTOR | consumes `kb.search` + `EmbeddingService` (no contract bút) | Workbench/Tenant-Wall/eval-gate-wiring (SWE); doc-factory/`kb.search`-filter/trace-sink/golden-set (DE — consumes only); eval-harness/judge/scorecard (AIE-2 — supplies citations only) |
   | **AIE-2 — Lưu Tiến Duy** | `packages/evalhub` (`studio_evalhub`) | Eval harness, LLM-judge + agreement-check, scorecard render, trace UX | scorecard format | eval-gate-wiring/publish/rollback (SWE — AIE-2 only supplies the verdict); golden-set (DE — consumes only); interpreter/executor/fence-executor/EmbeddingService (AIE-1 — consumes citations only); Tenant-Wall/INV-1 |
 
-  Full cross-owner boundary detail: `plans/260717-1516-studio-kit-template/research/studio-spec-and-workspace.md`
-  §A4. `apps/studio` (composition root, `core.*`+`obs.*` schema) and `apps/web` (Vite/React Flow
+  `apps/studio` (composition root, `core.*`+`obs.*` schema) and `apps/web` (Vite/React Flow
   scaffold) are **mentor**-owned — every quadrant package imports `studio_contracts` only, never
   each other or `apps/studio` (DIP, enforced by `.importlinter`).
 - **8** — **step Studio lifecycle demo** (money-shot steps in bold): (1) form creates agent ·
@@ -177,14 +158,18 @@ make demo       # 8-step lifecycle demo harness (wired in P10 — see tests/e2e/
 make lint       # ruff check . && mypy strict (packages + apps) && lint-imports (layers-contract)
 ```
 
-`apps/web` (Vite + React Flow, empty scaffold — Decision #11) is a separate Node project, NOT a
-Python workspace member:
+`apps/web` (Vite + React Flow — Decision #11; canvas/Playground/Chat all built out, 22 `.tsx` files,
+NOT an empty scaffold anymore) is a separate Node project, NOT a Python workspace member:
 
 ```bash
 cd apps/web
-corepack enable pnpm && pnpm install && pnpm build   # or: npm install && npm run build
+corepack enable pnpm && pnpm install && pnpm build   # CI-canonical (--frozen-lockfile, ci.yml)
 pnpm dev   # local dev server
 ```
+
+`apps/web` ships both `pnpm-lock.yaml` (canonical, CI runs `pnpm install --frozen-lockfile`) and
+`package-lock.json` — use `pnpm`, not `npm`: nothing tests the `npm` path, and 2 lockfiles can
+resolve 2 different dependency trees on 2 clean clones.
 
 ## Chạy thử demo Kế hoạch 2 (login → canvas → Test → Publish → Chat)
 
@@ -198,7 +183,7 @@ Publish → Chat), làm theo đúng các bước dưới, đã tự chạy thậ
 |---|---|---|
 | `uv >=0.11` | Toàn bộ 6 Python member | `uv` tự quản Python riêng (`uv python install`), tự tạo venv qua `uv sync` — **không cần** cài Python hệ thống hay `pip install` tay bất cứ gói nào. |
 | Docker (+ compose plugin) | Postgres/pgvector | `docker compose up -d` (dev stack, port 5432) hoặc `docker compose -f docker-compose.test.yml up -d` (test stack, port 5433, dùng cho bước dưới). |
-| Node.js + npm | `apps/web` | `apps/web` KHÔNG nằm trong `uv` workspace (Vite/TS riêng) — cần Node để `npm install`/`npm run dev`. |
+| Node.js + `pnpm` | `apps/web` | `apps/web` KHÔNG nằm trong `uv` workspace (Vite/TS riêng) — cần Node + `corepack enable pnpm`. `pnpm-lock.yaml` là canonical (CI dùng `--frozen-lockfile`); đừng dùng `npm install` dù repo có sẵn `package-lock.json`. |
 
 `pip install` duy nhất xuất hiện trong repo là dòng ghi chú optional `pip install .[obs]` (Langfuse,
 `.env.example`) — không cần cho demo, không cần cho bất kỳ `make` target nào ở trên.
@@ -206,113 +191,74 @@ Publish → Chat), làm theo đúng các bước dưới, đã tự chạy thậ
 ### Các bước
 
 ```bash
+# 0. Clone — BẮT BUỘC kèm cờ submodule. `apps/studio` + 6 `packages/*` đều là git submodule riêng
+# (repo private); clone thiếu cờ này để lại 9 thư mục RỖNG, và `make setup` ở bước 1 gãy bằng lỗi
+# nội bộ của `uv` — thông điệp KHÔNG có chữ "submodule" nào, dễ đi sai hướng tìm nguyên nhân. Đo
+# thật trên 1 clone trần: `agentcore-studio-contracts references a workspace in tool.uv.sources,
+# but is not a workspace member`.
+git clone --recurse-submodules <repo-url>
+cd agentcore-studio-kit
+# Đã lỡ clone KHÔNG kèm submodule? Sửa tại chỗ, không cần clone lại:
+git submodule update --init --recursive
+
 # 1. Cài dependency Python + copy env mẫu
 make setup
 cp .env.example .env
-# Sửa .env: STUDIO_JWT_SECRET phải >= 32 ký tự (Settings() raise ValidationError lúc khởi động
-# nếu ngắn hơn — vá kit#129 §3.3 mục #3, VinSOC pentest). .env.example đã để sẵn 1 placeholder
-# đủ dài để chạy dev ngay, nhưng KHÔNG dùng nguyên placeholder đó cho môi trường thật — xem
-# `openssl rand -hex 32` để sinh khoá thật.
-#
-# Sửa .env, phần 2: bỏ comment STUDIO_JUDGE_CACHE_PATH + STUDIO_JUDGE_CAP_PATH và điền đường
-# TUYỆT ĐỐI, GHI ĐƯỢC trên máy bạn (vd `/home/ban/agentcore-studio-kit/state/judge-cap.json`).
-# ĐÂY LÀ BƯỚC 1 chứ không phải bước 3b, vì hai biến này KHÔNG thuộc nhóm "provider thật":
-# `routes/publish.py:204` dựng `LLMJudge` VÔ ĐIỀU KIỆN, kể cả `STUDIO_USE_FAKE_PROVIDERS=true`
-# (judge nhận `ExtractiveFakeLLM`). Chỉ cần MỘT case trượt exact-match là judge bị hỏi, và
-# `_ghi_counter` ghi file cap TRƯỚC khi parse phản hồi ⇒ để nguyên default `/app/state/...` thì
-# nút "Chấm điểm" ném `PermissionError` (Linux) / `OSError: Read-only file system` (macOS) thành
-# 500 CHƯA BẮT — trên đường demo mặc định, không cần một key nào.
-# Đường phải TUYỆT ĐỐI: đường tương đối giải theo CWD, chạy `uv run` từ hai thư mục khác nhau cho
-# HAI file cap ⇒ cap 100/ngày âm thầm thành 200 mà không dòng code nào sai.
+# STUDIO_JWT_SECRET >= 32 ký tự (raise ValidationError nếu ngắn hơn) — sinh khoá thật bằng
+# `openssl rand -hex 32`, đừng dùng nguyên placeholder cho môi trường thật.
+# Bỏ comment STUDIO_JUDGE_CACHE_PATH/CAP_PATH, điền đường TUYỆT ĐỐI ghi được trên máy bạn. Cần
+# ngay từ bước này (LLMJudge dựng vô điều kiện kể cả fake providers) — thiếu ⇒ `PermissionError`
+# (Linux) / `OSError: Read-only file system` (macOS) thành 500 CHƯA BẮT khi bấm "Chấm điểm"; đường
+# tương đối (khác CWD) làm counter quota tách đôi âm thầm.
 
-# 2. Bật Postgres — dùng ĐÚNG dev stack (docker-compose.yml, port 5432, db "studio"), khớp
-# NGUYÊN VẸN giá trị mặc định trong .env.example — không cần sửa STUDIO_DATABASE_URL nào cả.
-# (docker-compose.test.yml là stack RIÊNG cho `make test-int`/CI, port 5433 khác — đừng lẫn 2
-# stack, .env chỉ trỏ đúng 1 trong 2.)
+# 2. Bật Postgres — dev stack (docker-compose.yml, port 5432), khớp mặc định .env.example, không
+# cần sửa STUDIO_DATABASE_URL. (docker-compose.test.yml là stack RIÊNG cho test/CI, port 5433.)
 docker compose up -d
 
-# 3. Seed 2 tenant demo (ankor/borea) — BẮT BUỘC trước lần chạy đầu, và sau MỖI LẦN chạy
-# `make test`/`pytest` (fixture `admin_pool` truncate toàn bộ bảng, kể cả `core.tenants`).
-# CHẠY TỪ GỐC KIT, ĐỪNG `cd apps/studio` trước — `.env` chỉ nằm ở gốc kit, Settings() tìm
-# `.env` theo thư mục đang đứng (CWD) khi lệnh chạy, không theo vị trí file script.
+# 3. Seed 2 tenant demo (ankor/borea) — bắt buộc trước lần chạy đầu và sau mỗi `make test`/`pytest`
+# (fixture truncate cả `core.tenants`). CHẠY TỪ GỐC KIT — Settings() tìm `.env` theo CWD.
 uv run python apps/studio/scripts/seed_demo_tenants.py
 
-# 3b. CHỈ KHI demo bằng provider THẬT (bắt buộc nếu muốn "Chấm điểm" ra số có nghĩa). Mặc định
-# `.env.example` để `STUDIO_USE_FAKE_PROVIDERS=true` ⇒ LLM và embedding đều là stub: luồng chạy
-# hết, nhưng điểm KHÔNG nói gì về chất lượng thật. BỐN biến dưới đây, thiếu bất kỳ cái nào là
-# hỏng giữa demo (cả bốn đã dựng lại được ở tổng duyệt 20/08):
+# 3b. CHỈ KHI demo bằng provider THẬT (bắt buộc để "Chấm điểm" ra số có nghĩa). Mặc định
+# STUDIO_USE_FAKE_PROVIDERS=true (stub) ⇒ luồng chạy nhưng điểm không phản ánh chất lượng thật.
+# Bốn biến sau, thiếu 1 là hỏng giữa demo:
 #
 #   STUDIO_USE_FAKE_PROVIDERS=false
-#   STUDIO_LLM_PROVIDER=openai            # file mẫu ship `gemini` — quên đổi là hỏng CÂM, xem dưới
+#   STUDIO_LLM_PROVIDER=openai            # file mẫu ship `gemini` — hay bị quên, hỏng CÂM (không 500)
 #   STUDIO_OPENAI_API_KEY=sk-...          # LLM trả lời + LLM-judge
-#   STUDIO_OPENROUTER_API_KEY=sk-or-...   # embedding (gemini-embedding-001 @2048); thiếu ⇒ 503
+#   STUDIO_OPENROUTER_API_KEY=sk-or-...   # embedding gemini-embedding-001@2048; thiếu ⇒ 503 cả /evaluate lẫn /chat
 #
-# (`STUDIO_JUDGE_CACHE_PATH`/`CAP_PATH` KHÔNG nằm trong danh sách này — chúng cần cho MỌI đường
-# `/evaluate`, kể cả stub, nên đã là việc của BƯỚC 1. Nếu bỏ qua 3b thì vẫn phải làm bước 1.)
-#
-# `STUDIO_LLM_PROVIDER` là biến QUYẾT ĐỊNH và là cái dễ sót nhất: nó required-no-default, nên ai
-# copy `.env.example` đều mang theo giá trị `gemini` của file mẫu. Đổi 3 biến kia mà quên dòng
-# này thì `build_llm()` vẫn rẽ `case LlmProvider.GEMINI` (`providers/factory.py`), và vì file mẫu
-# có `STUDIO_GEMINI_API_KEY=changeme` (truthy) nên KHÔNG có 500 "thiếu key" nào nổ — nó chết tận
-# lúc gọi API. `LLMJudge` cũng nhận `build_llm()` (`routes/publish.py:204`), nên chạy nhầm
-# provider thì mọi số đo `gpt-4o-mini` dưới đây KHÔNG áp cho cấu hình bạn đang chạy.
-#
-# KHÔNG cần set `STUDIO_OPENAI_MODEL`: bỏ trống = `gpt-4o-mini`, model duy nhất đo được là PASS
-# (`evalhub#31`: 0.9889 / 1.0000 · PASS 3/3; `o4-mini` cho 0.7556 · FAIL 3/3). Và ĐỪNG khai
-# `STUDIO_OPENAI_BASE_URL=` rỗng: pydantic-settings đọc value rỗng trong `.env` thành `""` chứ
-# KHÔNG phải `None`, mà `""` truyền thẳng vào `AsyncOpenAI(base_url=...)` ⇒ MỌI call LLM chết
-# `APIConnectionError: Connection error.` (đo, openai 3.3.x). Trong `.env.example` dòng đó đã
-# được comment sẵn — chỉ bỏ comment khi thật sự trỏ sang gateway khác.
-#
-# Thiếu `STUDIO_OPENROUTER_API_KEY` gãy CẢ HAI đường, không riêng nút "Chấm điểm": `/evaluate` VÀ
-# `POST /api/agents/{id}/chat` (`routes/chat.py:121` cũng gọi `build_embedding()`) — tức chat demo
-# tắt luôn, không phải chỉ mất điểm số.
-#
-# Quota judge là 100 call/NGÀY (`LLMJudge` cap, đếm trong file `STUDIO_JUDGE_CAP_PATH`). Một lượt
-# "Chấm điểm" 30 case tiêu 8–16 call ⇒ khoảng 6–9 lượt/ngày. Hết quota thì judge tụt nấc
-# exact-match, điểm rơi từ ~0.93 xuống ~0.70 và verdict thành FAIL — tín hiệu duy nhất là một
-# dòng log. Trước buổi demo: xoá file cap đó cho quota về 0.
+# (STUDIO_JUDGE_CACHE_PATH/CAP_PATH đã set ở bước 1 — cần cho mọi đường /evaluate, không riêng 3b.)
+# STUDIO_OPENAI_MODEL để trống = gpt-4o-mini (model duy nhất đo PASS: evalhub#31 0.9889/1.0000;
+# o4-mini FAIL). ĐỪNG khai STUDIO_OPENAI_BASE_URL= rỗng — "" khác None, làm mọi call LLM chết
+# APIConnectionError.
+# Judge quota 100 call/ngày — 1 lượt "Chấm điểm" tốn 8-16 call (~6-9 lượt/ngày); xoá file cap
+# trước demo để về 0.
 
-# 4. Chạy backend (apps/studio) — cửa sổ terminal riêng. Lần khởi động này chạy lifespan = dựng
-# schema (`ensure_all_schemas`) + CẤP QUYỀN DML cho role `studio_app` (`grant_app_privileges`,
-# `app.py:39-40`). PHẢI lên TRƯỚC bước 5: `studio_app` chỉ có quyền INSERT vào `kb.chunks` SAU khi
-# backend boot — chạy ingest trước sẽ gãy `permission denied for schema kb`.
-# `--no-proxy-headers` (app#18): uvicorn mặc định tự tin `X-Forwarded-For` từ MỌI kết nối tới từ
-# 127.0.0.1 (kể cả `curl localhost` ngay trên máy này) và ghi đè `request.client` TRƯỚC KHI app
-# thấy request — độc lập với `STUDIO_TRUST_X_FORWARDED_FOR`, nên bỏ cờ này thì rate-limit
-# `/api/auth/login` né được bằng cách tự set header giả, không cần chạm gì tới cờ app. CHỈ bỏ cờ
-# này (và bật `STUDIO_TRUST_X_FORWARDED_FOR=true`) khi triển khai THẬT có reverse proxy đáng tin
-# GHI ĐÈ (không nối thêm) `X-Forwarded-For` trước khi tới app.
+# 4. Chạy backend (apps/studio) — cửa sổ terminal riêng. Lifespan dựng schema + cấp quyền DML cho
+# studio_app — PHẢI lên TRƯỚC bước 5 (ingest trước sẽ gãy "permission denied for schema kb").
+# `--no-proxy-headers`: uvicorn mặc định tin X-Forwarded-For từ mọi kết nối 127.0.0.1, cho phép né
+# rate-limit login bằng header giả — chỉ bỏ cờ này khi có reverse proxy thật GHI ĐÈ header đó.
 uv run uvicorn studio_app.app:create_app --factory --app-dir apps/studio/src --host 127.0.0.1 --port 8000 --reload --no-proxy-headers
 
-# 5. Nạp corpus Callisto **2.0** vào kb.chunks (80 doc / 800 chunk: ankor 400 · borea 400) — CHẠY TỪ GỐC KIT,
-# cửa sổ terminal riêng, SAU khi backend (bước 4) đã in "Application startup complete". BẮT BUỘC
-# trước khi demo chat/retrieval. Sau mỗi lần `make test`/`pytest` (fixture truncate `kb.chunks` +
-# `core.tenants`) chỉ cần chạy lại BƯỚC 3 + 5 — KHÔNG phải restart backend (truncate xoá dòng, không
-# xoá grants). THIẾU BƯỚC NÀY → `kb.search` trả RỖNG, chat không ra kết quả.
-# Script đọc `STUDIO_DATABASE_URL` từ BIẾN MÔI TRƯỜNG (không tự nạp .env như backend) → export đúng
-# dev-stack DSN dưới đây; KHỚP NGUYÊN VẸN .env.example, role non-owner `studio_app` để RLS WITH CHECK
-# còn cắn. Idempotent — chạy lại không nhân đôi.
+# 5. Nạp corpus Callisto 2.0 vào kb.chunks (80 doc/800 chunk: ankor 400 · borea 400) — CHẠY TỪ GỐC
+# KIT, cửa sổ terminal riêng, SAU khi backend (bước 4) in "Application startup complete". Sau mỗi
+# `make test`/`pytest` (truncate kb.chunks) chỉ cần chạy lại BƯỚC 3 + 5, không restart backend.
 export STUDIO_DATABASE_URL=postgresql://studio_app:changeme@localhost:5432/studio
 uv run python packages/kb/scripts/ingest_callisto_v2.py
 
-# ⚠️ ĐÚNG script là `..._v2.py`. Bản 1.0 (`ingest_callisto.py`) nạp corpus 140 chunk bằng bộ nhúng
-# bag-of-words; sau cutover 2.0 (`kb#43`) cột là `vector(2048)` và đường truy vấn nhúng bằng
-# `gemini-embedding-001` — dùng script 1.0 thì corpus và query nằm ở HAI không gian vector khác
-# nhau: `recall@3` rơi từ 22/22 xuống 1/22 (đo được), agent trả lời trôi chảy từ chunk sai hoặc từ
-# chối mọi câu, và KHÔNG lỗi nào nổ. `..._v2.py` đọc vector từ cache đã commit nên KHÔNG cần API key.
-# Kiểm sau khi nạp — PHẢI qua superuser `postgres`, KHÔNG dùng DSN vừa export ở trên: `kb.chunks`
-# là `FORCE ROW LEVEL SECURITY` (`studio_kb/schema.py`) và cả `studio_owner` lẫn `studio_app` đều
-# `NOSUPERUSER` (`docker/postgres-init/00-roles.sql`) ⇒ chưa set `app.tenant_id` thì ra 0 dòng, set
-# rồi thì ra 400/tenant — không bao giờ 800:
+# ⚠️ ĐÚNG script là `..._v2.py`. Bản 1.0 (`ingest_callisto.py`) dùng bộ nhúng bag-of-words — corpus
+# và query nằm ở HAI không gian vector khác nhau, recall@3 rơi từ 22/22 xuống 1/22, KHÔNG lỗi nào
+# nổ. `..._v2.py` đọc vector từ cache đã commit, không cần API key.
+# Kiểm (qua superuser postgres — studio_app/studio_owner đều NOSUPERUSER, RLS chặn thấy full 800):
 #   docker compose exec postgres psql -U postgres -d studio \
 #     -c "select vector_dims(embedding), count(*) from kb.chunks group by 1;"
 #   →  2048 | 800
 
 # 6. Chạy frontend (apps/web) — cửa sổ terminal riêng
 cd apps/web
-npm install
-npm run dev   # mặc định http://127.0.0.1:5173
+corepack enable pnpm && pnpm install   # KHÔNG dùng npm install — xem cảnh báo pnpm/npm ở trên
+pnpm dev   # mặc định http://127.0.0.1:5173
 ```
 
 ### Đăng nhập — chỉ còn 1 đường, bằng mật khẩu thật
@@ -376,16 +322,84 @@ PY
 rỗng, vì role có đủ cả 4 role nội dung). Cùng cách này, đổi `ANKOR_ID`/email/roles để tạo tài khoản
 chỉ có 1 role nội dung (thử ca "chỉ thấy Chat, không thấy canvas" — role thiếu `"admin"`).
 
-Rồi Publish (tự chạy `EvalHarness` trên nguyên golden-set + gate trong 1 lần bấm).
+> 3 mục UI dưới đây (canvas/trace/chat) khớp đúng con trỏ `apps/web` đang ghim ở PR này
+> (`0e4bd1e`, web#10). `apps/web` main đã đi trước ít nhất 1 commit (`9688e6f`, web#11 — gộp tab
+> "Agent đã publish" vào Canvas qua `OpenAgentModal.tsx`, đổi panel role thành "Thử vai trò"). Nếu
+> con trỏ kit đã bump qua khỏi `0e4bd1e` lúc bạn đọc, tự kiểm lại 3 chỗ trước khi tin: tab
+> "Agent đã publish"/Rollback, khối "Test agent với role", và cách nạp 1 recipe cũ vào canvas.
 
-**`recipe_hash` (DEC-03) đã có producer thật VÀ đã được nối vào đường publish** — producer
-`studio_workbench.publish.recipe_hash()` merge ở
-[`agentcore-studio-workbench#27`](https://github.com/AI20K-VGR/agentcore-studio-workbench/pull/27),
-call-site merge ở [`agentcore-studio-app#26`](https://github.com/AI20K-VGR/agentcore-studio-app/pull/26):
-`_evaluate` truyền `recipe=` vào `EngineAgentRunner` (nên recipe được CHẤM đúng là recipe được
-PUBLISH — đóng kit#127) rồi truyền `recipe_hash=recipe_hash(recipe)` vào `EvalHarness.run()`.
-⇒ `Publish` **không còn LUÔN trả 409**. 409 giờ chỉ còn nghĩa `gate.verdict == "FAIL"` thật (agent
-chưa đạt ngưỡng) hoặc `scorecard.recipe_hash` lệch với recipe đang publish.
+### Dựng recipe trên canvas
+
+Admin đăng nhập vào thẳng tab **Canvas**. Tab này mở ra đã có sẵn 1 khung agent
+`agent-callisto-d12` với DAG mẫu 4 node (`kb-retrieve → llm-step → tool-call → end`) và
+`golden_set_ref: callisto-2.0-golden-30-v1` — khớp đúng corpus vừa nạp ở bước 5, dùng luôn để đi
+hết luồng mà không cần vẽ tay. Sidebar phải báo "graph-lint: 7/7 luật sạch" khi recipe hợp lệ.
+
+Muốn tự dựng agent mới: bấm **"Tạo agent"** (cột trái) → đặt tên → kéo node từ Palette vào canvas
+(6 loại đóng: KB Retrieve, LLM Step, Condition, Tool Call, HITL Pause, End) → nối cạnh bằng kéo
+chuột giữa 2 handle → bấm đúp 1 node để sửa param (`query`/`top_k`/`section_roles` cho KB Retrieve,
+`temperature` cho LLM Step, `tool` cho Tool Call…), bấm đúp 1 cạnh để sửa `when`. Bấm đúp thanh
+tiêu đề khung mở **"Cấu hình Agent"**: Định danh (`agent_id`/`instructions`/`model`), Tool
+whitelist, KB Binding (`kb_id` + section scope), Eval Gate (`golden_set_ref` + ngưỡng
+`success`/`citation_accuracy`). graph-lint fail-closed — Test/Publish khoá cứng tới khi đủ 7 luật:
+6 loại node · cạnh có đích · 1 start node · ≤1 cạnh ra mỗi node · không chu trình · kết ở `end` ·
+tool nằm trong whitelist.
+
+### Chạy — Test → xem trace
+
+Sidebar phải, mục **Playground**, bấm **Test** (khoá nếu graph-lint đỏ) → `POST /api/runs`,
+interpreter chạy DAG thật, rồi UI tự `GET /api/runs/{run_id}` lại bằng 1 request TÁCH RIÊNG (không
+tin thẳng response POST) để chứng minh trace ghi đúng — hiện `TraceViewer`: từng event theo đúng
+thứ tự dispatch, có `node_type`/`node_id`/timestamp/`tokens {prompt, completion}`/citations/
+outputs, cộng dòng tổng `Σtokens=…`.
+
+**Trung thực:** `cost` mỗi event hiện LUÔN in "chưa đo" — `interpreter.py` chưa có nguồn cost thật
+(cost-lineage còn mở, kit#120). `tokens` là số thật, `cost` thì chưa wire — đừng báo cáo cost như
+đã đo.
+
+### Chấm điểm → Publish
+
+Mục **Chấm điểm**, bấm nút cùng tên → `POST /api/agents/{agent_id}/evaluate`, chạy nguyên
+`golden_set_ref` qua `EvalHarness` thật, hiện `verdict`/`success_rate`/`citation_accuracy` — CHƯA
+publish, chỉ xem điểm trước. Nút **Publish** chỉ **sáng** khi lần Chấm điểm gần nhất `verdict=PASS`
+cho ĐÚNG recipe đang có trên canvas (đổi bất cứ gì sau khi chấm điểm làm nút tắt lại — phải chấm
+lại). Bấm Publish gọi `POST /api/agents/{agent_id}/publish` — server tự chấm lại từ đầu (không tin
+điểm client) rồi gate thật; kết quả `published` (kèm nút "Sang tab Chat để thử") hoặc `blocked`
+(HTTP 409, kèm lý do + scorecard, nút "Sang tab Rollback"). `409` chỉ khi `gate.verdict == "FAIL"`
+thật hoặc `scorecard.recipe_hash` lệch với recipe đang publish — không phải luôn-409.
+
+**Đo được, đừng tưởng treo:** với provider thật, 1 lượt Chấm điểm chạy nguyên 30 case mất **~55s**,
+Publish (chấm lại + gate) mất thêm **~43s** — không thấy phản hồi trong vài giây đầu là bình
+thường, đừng bấm lại (đo sống, review PR#196 @dholmes0207, 2026-08-20).
+
+**Biên mỏng ở golden set:** ngưỡng `success` mặc định 0.9 trên 30 case cần **≥27/30**. Đo 2 lượt
+liên tiếp cùng cấu hình ra `29/30` (0.9667) rồi `28/30` (0.9333) — chỉ cách FAIL đúng 1-2 case. Nếu
+demo sống cho Gate-3, đừng coi 1 lần PASS là ổn định; chạy lại vài lượt trước buổi chấm thật.
+
+Nhánh **chặn phía server đã xác nhận sống** (không còn là lý thuyết đọc code):
+`POST /publish → HTTP 409`, message `"gate.verdict='FAIL' … blocked (INV-6); previously published
+version re-asserted live"` kèm scorecard — nghĩa là bản published cũ vẫn đứng, không bị artifact
+tệ đè lên (đo sống, review PR#196 @dholmes0207, 2026-08-20). Cách chắc ăn nhất để tự tái tạo: sửa 2
+ngưỡng `success`/`citation_accuracy` trong "Cấu hình Agent" lên gần 1.0 trước khi Chấm điểm —
+verdict FAIL gần như chắc chắn với model thật, nút Publish khoá lại ngay trên UI.
+
+**Rollback thì CHƯA ai xác nhận sống** (kể cả người đo nhánh chặn ở trên) — nằm ở tab "Agent đã
+publish": chọn agent → chọn version cũ ở dropdown → bấm **Rollback**
+(`POST /api/agents/{agent_id}/rollback`) — cần đã publish ≥2 version mới có gì để rollback về. *Tự
+tay thử qua 1 lượt trước khi đưa nhánh rollback vào evidence-pack Gate-3.*
+
+### Dùng — chat với agent đã publish
+
+Tab **"Dùng thử"** (icon chat) — dropdown chọn agent đã publish (tên hiển thị dạng đọc được, vd
+"Agent callisto d12"; giá trị gửi lên server vẫn là `agent_id` slug gốc). Admin thấy thêm khối
+"Test agent với role" (checkbox theo phòng ban, mặc định tick hết) để tự thu hẹp role trước khi
+hỏi — dùng đúng ô này làm phép fence-proof: bỏ tick phòng ban/tenant kia, hỏi 1 câu chỉ dữ liệu
+phòng ban đó mới có — kỳ vọng agent từ chối hoặc không trả lời đúng. Gõ câu hỏi → **Gửi** →
+`POST /api/agents/{agent_id}/chat`; trả lời kèm badge version, citation (nếu có), và nút "Xem
+trace" mở lại đúng `TraceViewer` của lượt chat đó qua `run_id` riêng của lượt đó.
+
+Tài khoản chỉ có role nội dung (thiếu `"admin"`, xem cách tạo ở trên) đăng nhập vào thẳng màn hình
+chat toàn màn hình này, không thấy tab nào khác — đúng hành vi "employee chỉ dùng, không xây".
 
 ## CI + branch protection (F16)
 
@@ -402,12 +416,10 @@ deliberately leave `leak-test` OUT of that list. This is a manual repo-settings 
 Branches → branch protection rule → required status checks) — nothing in this kit automates it,
 and no code here substitutes for checking it once the repo exists on GitHub.
 
-## Fallback (Hướng A)
+## Phân phối repo & phân quyền
 
-If per-package `uv`/mypy/IDE tooling costs the mentor too much time in week 0, the directory tree
-can stay exactly as-is while collapsing to a single root `pyproject.toml` (Hướng A) — the ownership
-boundary (packaging + CI-per-package + **per-repo permission** + schema-per-quadrant) still holds
-without a true workspace. Not the default; documented here as an explicit escape hatch.
+Kit được tách thành **1 repo cha + 6 submodule** (mỗi domain 1 repo private, ranh giới quyền cứng ở
+tầng git). CODEOWNERS đã gỡ. Quy trình đầy đủ: **`GITFLOWS.md`**.
 
-> **Phân phối repo & phân quyền:** kit được tách thành **1 repo cha + 6 submodule** (mỗi domain 1
-> repo private, ranh giới quyền cứng ở tầng git). CODEOWNERS đã gỡ. Quy trình đầy đủ: **`GITFLOWS.md`**.
+(Fallback tooling cho mentor ở Tuần 0, "Hướng A" — collapse về 1 root `pyproject.toml` nếu
+per-package `uv`/mypy/IDE tốn quá nhiều thời gian — chi tiết ở `docs/ONBOARDING.md`.)
