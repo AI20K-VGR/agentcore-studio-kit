@@ -6,7 +6,7 @@ engineers (DE · SWE · AIE-1 · AIE-2) build an AI-agent authoring tool end to 
 
 Infra (Docker/Postgres/CI/contracts/RLS/queue/OTel) is WIRE — it runs Day-1. Business logic in the
 4 quadrant packages is intentionally TRÔNG (`Protocol` + `NotImplementedError` + a RED acceptance
-test = the spec each engineer fills in). See `docs/decisions.md` for the full decision record.
+test = the spec each engineer fills in). See `docs/decisions/README.md` for the full decision record.
 
 ## Workspace layout
 
@@ -158,14 +158,18 @@ make demo       # 8-step lifecycle demo harness (wired in P10 — see tests/e2e/
 make lint       # ruff check . && mypy strict (packages + apps) && lint-imports (layers-contract)
 ```
 
-`apps/web` (Vite + React Flow, empty scaffold — Decision #11) is a separate Node project, NOT a
-Python workspace member:
+`apps/web` (Vite + React Flow — Decision #11; canvas/Playground/Chat all built out, 22 `.tsx` files,
+NOT an empty scaffold anymore) is a separate Node project, NOT a Python workspace member:
 
 ```bash
 cd apps/web
-corepack enable pnpm && pnpm install && pnpm build   # or: npm install && npm run build
+corepack enable pnpm && pnpm install && pnpm build   # CI-canonical (--frozen-lockfile, ci.yml)
 pnpm dev   # local dev server
 ```
+
+`apps/web` ships both `pnpm-lock.yaml` (canonical, CI runs `pnpm install --frozen-lockfile`) and
+`package-lock.json` — use `pnpm`, not `npm`: nothing tests the `npm` path, and 2 lockfiles can
+resolve 2 different dependency trees on 2 clean clones.
 
 ## Chạy thử demo Kế hoạch 2 (login → canvas → Test → Publish → Chat)
 
@@ -179,7 +183,7 @@ Publish → Chat), làm theo đúng các bước dưới, đã tự chạy thậ
 |---|---|---|
 | `uv >=0.11` | Toàn bộ 6 Python member | `uv` tự quản Python riêng (`uv python install`), tự tạo venv qua `uv sync` — **không cần** cài Python hệ thống hay `pip install` tay bất cứ gói nào. |
 | Docker (+ compose plugin) | Postgres/pgvector | `docker compose up -d` (dev stack, port 5432) hoặc `docker compose -f docker-compose.test.yml up -d` (test stack, port 5433, dùng cho bước dưới). |
-| Node.js + npm | `apps/web` | `apps/web` KHÔNG nằm trong `uv` workspace (Vite/TS riêng) — cần Node để `npm install`/`npm run dev`. |
+| Node.js + `pnpm` | `apps/web` | `apps/web` KHÔNG nằm trong `uv` workspace (Vite/TS riêng) — cần Node + `corepack enable pnpm`. `pnpm-lock.yaml` là canonical (CI dùng `--frozen-lockfile`); đừng dùng `npm install` dù repo có sẵn `package-lock.json`. |
 
 `pip install` duy nhất xuất hiện trong repo là dòng ghi chú optional `pip install .[obs]` (Langfuse,
 `.env.example`) — không cần cho demo, không cần cho bất kỳ `make` target nào ở trên.
@@ -187,14 +191,25 @@ Publish → Chat), làm theo đúng các bước dưới, đã tự chạy thậ
 ### Các bước
 
 ```bash
+# 0. Clone — BẮT BUỘC kèm cờ submodule. `apps/studio` + 6 `packages/*` đều là git submodule riêng
+# (repo private); clone thiếu cờ này để lại 9 thư mục RỖNG, và `make setup` ở bước 1 gãy bằng lỗi
+# nội bộ của `uv` — thông điệp KHÔNG có chữ "submodule" nào, dễ đi sai hướng tìm nguyên nhân. Đo
+# thật trên 1 clone trần: `agentcore-studio-contracts references a workspace in tool.uv.sources,
+# but is not a workspace member`.
+git clone --recurse-submodules <repo-url>
+cd agentcore-studio-kit
+# Đã lỡ clone KHÔNG kèm submodule? Sửa tại chỗ, không cần clone lại:
+git submodule update --init --recursive
+
 # 1. Cài dependency Python + copy env mẫu
 make setup
 cp .env.example .env
 # STUDIO_JWT_SECRET >= 32 ký tự (raise ValidationError nếu ngắn hơn) — sinh khoá thật bằng
 # `openssl rand -hex 32`, đừng dùng nguyên placeholder cho môi trường thật.
 # Bỏ comment STUDIO_JUDGE_CACHE_PATH/CAP_PATH, điền đường TUYỆT ĐỐI ghi được trên máy bạn. Cần
-# ngay từ bước này (LLMJudge dựng vô điều kiện kể cả fake providers) — thiếu ⇒ 500 khi bấm "Chấm
-# điểm"; đường tương đối (khác CWD) làm counter quota tách đôi âm thầm.
+# ngay từ bước này (LLMJudge dựng vô điều kiện kể cả fake providers) — thiếu ⇒ `PermissionError`
+# (Linux) / `OSError: Read-only file system` (macOS) thành 500 CHƯA BẮT khi bấm "Chấm điểm"; đường
+# tương đối (khác CWD) làm counter quota tách đôi âm thầm.
 
 # 2. Bật Postgres — dev stack (docker-compose.yml, port 5432), khớp mặc định .env.example, không
 # cần sửa STUDIO_DATABASE_URL. (docker-compose.test.yml là stack RIÊNG cho test/CI, port 5433.)
@@ -242,8 +257,8 @@ uv run python packages/kb/scripts/ingest_callisto_v2.py
 
 # 6. Chạy frontend (apps/web) — cửa sổ terminal riêng
 cd apps/web
-npm install
-npm run dev   # mặc định http://127.0.0.1:5173
+corepack enable pnpm && pnpm install   # KHÔNG dùng npm install — xem cảnh báo pnpm/npm ở trên
+pnpm dev   # mặc định http://127.0.0.1:5173
 ```
 
 ### Đăng nhập — chỉ còn 1 đường, bằng mật khẩu thật
@@ -307,6 +322,12 @@ PY
 rỗng, vì role có đủ cả 4 role nội dung). Cùng cách này, đổi `ANKOR_ID`/email/roles để tạo tài khoản
 chỉ có 1 role nội dung (thử ca "chỉ thấy Chat, không thấy canvas" — role thiếu `"admin"`).
 
+> 3 mục UI dưới đây (canvas/trace/chat) khớp đúng con trỏ `apps/web` đang ghim ở PR này
+> (`0e4bd1e`, web#10). `apps/web` main đã đi trước ít nhất 1 commit (`9688e6f`, web#11 — gộp tab
+> "Agent đã publish" vào Canvas qua `OpenAgentModal.tsx`, đổi panel role thành "Thử vai trò"). Nếu
+> con trỏ kit đã bump qua khỏi `0e4bd1e` lúc bạn đọc, tự kiểm lại 3 chỗ trước khi tin: tab
+> "Agent đã publish"/Rollback, khối "Test agent với role", và cách nạp 1 recipe cũ vào canvas.
+
 ### Dựng recipe trên canvas
 
 Admin đăng nhập vào thẳng tab **Canvas**. Tab này mở ra đã có sẵn 1 khung agent
@@ -347,13 +368,25 @@ lại). Bấm Publish gọi `POST /api/agents/{agent_id}/publish` — server t�
 (HTTP 409, kèm lý do + scorecard, nút "Sang tab Rollback"). `409` chỉ khi `gate.verdict == "FAIL"`
 thật hoặc `scorecard.recipe_hash` lệch với recipe đang publish — không phải luôn-409.
 
-Cách chắc ăn nhất để tự thấy nhánh **chặn**: sửa 2 ngưỡng `success`/`citation_accuracy` trong "Cấu
-hình Agent" lên gần 1.0 trước khi Chấm điểm — verdict FAIL gần như chắc chắn với model thật, nút
-Publish khoá lại ngay trên UI (không cần round-trip server mới thấy bị chặn). **Rollback thật** nằm
-ở tab "Agent đã publish": chọn agent → chọn version cũ ở dropdown → bấm **Rollback**
-(`POST /api/agents/{agent_id}/rollback`) — cần đã publish ≥2 version mới có gì để rollback về.
-*[CHƯA TỰ CHẠY SỐNG nhánh block+rollback để xác nhận — tự tay thử qua 1 lượt trước khi đưa vào
-evidence-pack Gate-3, đừng tin nguyên văn đoạn này.]*
+**Đo được, đừng tưởng treo:** với provider thật, 1 lượt Chấm điểm chạy nguyên 30 case mất **~55s**,
+Publish (chấm lại + gate) mất thêm **~43s** — không thấy phản hồi trong vài giây đầu là bình
+thường, đừng bấm lại (đo sống, review PR#196 @dholmes0207, 2026-08-20).
+
+**Biên mỏng ở golden set:** ngưỡng `success` mặc định 0.9 trên 30 case cần **≥27/30**. Đo 2 lượt
+liên tiếp cùng cấu hình ra `29/30` (0.9667) rồi `28/30` (0.9333) — chỉ cách FAIL đúng 1-2 case. Nếu
+demo sống cho Gate-3, đừng coi 1 lần PASS là ổn định; chạy lại vài lượt trước buổi chấm thật.
+
+Nhánh **chặn phía server đã xác nhận sống** (không còn là lý thuyết đọc code):
+`POST /publish → HTTP 409`, message `"gate.verdict='FAIL' … blocked (INV-6); previously published
+version re-asserted live"` kèm scorecard — nghĩa là bản published cũ vẫn đứng, không bị artifact
+tệ đè lên (đo sống, review PR#196 @dholmes0207, 2026-08-20). Cách chắc ăn nhất để tự tái tạo: sửa 2
+ngưỡng `success`/`citation_accuracy` trong "Cấu hình Agent" lên gần 1.0 trước khi Chấm điểm —
+verdict FAIL gần như chắc chắn với model thật, nút Publish khoá lại ngay trên UI.
+
+**Rollback thì CHƯA ai xác nhận sống** (kể cả người đo nhánh chặn ở trên) — nằm ở tab "Agent đã
+publish": chọn agent → chọn version cũ ở dropdown → bấm **Rollback**
+(`POST /api/agents/{agent_id}/rollback`) — cần đã publish ≥2 version mới có gì để rollback về. *Tự
+tay thử qua 1 lượt trước khi đưa nhánh rollback vào evidence-pack Gate-3.*
 
 ### Dùng — chat với agent đã publish
 
