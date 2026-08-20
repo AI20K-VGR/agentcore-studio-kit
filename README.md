@@ -213,6 +213,17 @@ cp .env.example .env
 # nếu ngắn hơn — vá kit#129 §3.3 mục #3, VinSOC pentest). .env.example đã để sẵn 1 placeholder
 # đủ dài để chạy dev ngay, nhưng KHÔNG dùng nguyên placeholder đó cho môi trường thật — xem
 # `openssl rand -hex 32` để sinh khoá thật.
+#
+# Sửa .env, phần 2: bỏ comment STUDIO_JUDGE_CACHE_PATH + STUDIO_JUDGE_CAP_PATH và điền đường
+# TUYỆT ĐỐI, GHI ĐƯỢC trên máy bạn (vd `/home/ban/agentcore-studio-kit/state/judge-cap.json`).
+# ĐÂY LÀ BƯỚC 1 chứ không phải bước 3b, vì hai biến này KHÔNG thuộc nhóm "provider thật":
+# `routes/publish.py:204` dựng `LLMJudge` VÔ ĐIỀU KIỆN, kể cả `STUDIO_USE_FAKE_PROVIDERS=true`
+# (judge nhận `ExtractiveFakeLLM`). Chỉ cần MỘT case trượt exact-match là judge bị hỏi, và
+# `_ghi_counter` ghi file cap TRƯỚC khi parse phản hồi ⇒ để nguyên default `/app/state/...` thì
+# nút "Chấm điểm" ném `PermissionError` (Linux) / `OSError: Read-only file system` (macOS) thành
+# 500 CHƯA BẮT — trên đường demo mặc định, không cần một key nào.
+# Đường phải TUYỆT ĐỐI: đường tương đối giải theo CWD, chạy `uv run` từ hai thư mục khác nhau cho
+# HAI file cap ⇒ cap 100/ngày âm thầm thành 200 mà không dòng code nào sai.
 
 # 2. Bật Postgres — dùng ĐÚNG dev stack (docker-compose.yml, port 5432, db "studio"), khớp
 # NGUYÊN VẸN giá trị mặc định trong .env.example — không cần sửa STUDIO_DATABASE_URL nào cả.
@@ -228,26 +239,23 @@ uv run python apps/studio/scripts/seed_demo_tenants.py
 
 # 3b. CHỈ KHI demo bằng provider THẬT (bắt buộc nếu muốn "Chấm điểm" ra số có nghĩa). Mặc định
 # `.env.example` để `STUDIO_USE_FAKE_PROVIDERS=true` ⇒ LLM và embedding đều là stub: luồng chạy
-# hết, nhưng điểm KHÔNG nói gì về chất lượng thật. NĂM biến dưới đây, thiếu bất kỳ cái nào là
-# hỏng giữa demo (cả năm đã dựng lại được ở tổng duyệt 20/08):
+# hết, nhưng điểm KHÔNG nói gì về chất lượng thật. BỐN biến dưới đây, thiếu bất kỳ cái nào là
+# hỏng giữa demo (cả bốn đã dựng lại được ở tổng duyệt 20/08):
 #
 #   STUDIO_USE_FAKE_PROVIDERS=false
 #   STUDIO_LLM_PROVIDER=openai            # file mẫu ship `gemini` — quên đổi là hỏng CÂM, xem dưới
 #   STUDIO_OPENAI_API_KEY=sk-...          # LLM trả lời + LLM-judge
 #   STUDIO_OPENROUTER_API_KEY=sk-or-...   # embedding (gemini-embedding-001 @2048); thiếu ⇒ 503
-#   STUDIO_JUDGE_CACHE_PATH / STUDIO_JUDGE_CAP_PATH  → đường TUYỆT ĐỐI, GHI ĐƯỢC trên máy
+#
+# (`STUDIO_JUDGE_CACHE_PATH`/`CAP_PATH` KHÔNG nằm trong danh sách này — chúng cần cho MỌI đường
+# `/evaluate`, kể cả stub, nên đã là việc của BƯỚC 1. Nếu bỏ qua 3b thì vẫn phải làm bước 1.)
 #
 # `STUDIO_LLM_PROVIDER` là biến QUYẾT ĐỊNH và là cái dễ sót nhất: nó required-no-default, nên ai
-# copy `.env.example` đều mang theo giá trị `gemini` của file mẫu. Đổi 4 biến kia mà quên dòng
+# copy `.env.example` đều mang theo giá trị `gemini` của file mẫu. Đổi 3 biến kia mà quên dòng
 # này thì `build_llm()` vẫn rẽ `case LlmProvider.GEMINI` (`providers/factory.py`), và vì file mẫu
 # có `STUDIO_GEMINI_API_KEY=changeme` (truthy) nên KHÔNG có 500 "thiếu key" nào nổ — nó chết tận
 # lúc gọi API. `LLMJudge` cũng nhận `build_llm()` (`routes/publish.py:204`), nên chạy nhầm
 # provider thì mọi số đo `gpt-4o-mini` dưới đây KHÔNG áp cho cấu hình bạn đang chạy.
-#
-# Hai biến judge: mặc định trong code là `/app/state/...` (đúng cho image, sai cho máy thật) —
-# chạy ngoài container mà không override thì lần gọi judge ĐẦU TIÊN ném `PermissionError` thành
-# 500. Đường phải TUYỆT ĐỐI: đường tương đối giải theo CWD, nên chạy `uv run` từ hai thư mục khác
-# nhau cho HAI file cap ⇒ cap 100/ngày âm thầm thành 200 mà không dòng code nào sai.
 #
 # KHÔNG cần set `STUDIO_OPENAI_MODEL`: bỏ trống = `gpt-4o-mini`, model duy nhất đo được là PASS
 # (`evalhub#31`: 0.9889 / 1.0000 · PASS 3/3; `o4-mini` cho 0.7556 · FAIL 3/3). Và ĐỪNG khai
