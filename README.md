@@ -213,6 +213,17 @@ cp .env.example .env
 # nếu ngắn hơn — vá kit#129 §3.3 mục #3, VinSOC pentest). .env.example đã để sẵn 1 placeholder
 # đủ dài để chạy dev ngay, nhưng KHÔNG dùng nguyên placeholder đó cho môi trường thật — xem
 # `openssl rand -hex 32` để sinh khoá thật.
+#
+# Sửa .env, phần 2: bỏ comment STUDIO_JUDGE_CACHE_PATH + STUDIO_JUDGE_CAP_PATH và điền đường
+# TUYỆT ĐỐI, GHI ĐƯỢC trên máy bạn (vd `/home/ban/agentcore-studio-kit/state/judge-cap.json`).
+# ĐÂY LÀ BƯỚC 1 chứ không phải bước 3b, vì hai biến này KHÔNG thuộc nhóm "provider thật":
+# `routes/publish.py:204` dựng `LLMJudge` VÔ ĐIỀU KIỆN, kể cả `STUDIO_USE_FAKE_PROVIDERS=true`
+# (judge nhận `ExtractiveFakeLLM`). Chỉ cần MỘT case trượt exact-match là judge bị hỏi, và
+# `_ghi_counter` ghi file cap TRƯỚC khi parse phản hồi ⇒ để nguyên default `/app/state/...` thì
+# nút "Chấm điểm" ném `PermissionError` (Linux) / `OSError: Read-only file system` (macOS) thành
+# 500 CHƯA BẮT — trên đường demo mặc định, không cần một key nào.
+# Đường phải TUYỆT ĐỐI: đường tương đối giải theo CWD, chạy `uv run` từ hai thư mục khác nhau cho
+# HAI file cap ⇒ cap 100/ngày âm thầm thành 200 mà không dòng code nào sai.
 
 # 2. Bật Postgres — dùng ĐÚNG dev stack (docker-compose.yml, port 5432, db "studio"), khớp
 # NGUYÊN VẸN giá trị mặc định trong .env.example — không cần sửa STUDIO_DATABASE_URL nào cả.
@@ -226,6 +237,42 @@ docker compose up -d
 # `.env` theo thư mục đang đứng (CWD) khi lệnh chạy, không theo vị trí file script.
 uv run python apps/studio/scripts/seed_demo_tenants.py
 
+# 3b. CHỈ KHI demo bằng provider THẬT (bắt buộc nếu muốn "Chấm điểm" ra số có nghĩa). Mặc định
+# `.env.example` để `STUDIO_USE_FAKE_PROVIDERS=true` ⇒ LLM và embedding đều là stub: luồng chạy
+# hết, nhưng điểm KHÔNG nói gì về chất lượng thật. BỐN biến dưới đây, thiếu bất kỳ cái nào là
+# hỏng giữa demo (cả bốn đã dựng lại được ở tổng duyệt 20/08):
+#
+#   STUDIO_USE_FAKE_PROVIDERS=false
+#   STUDIO_LLM_PROVIDER=openai            # file mẫu ship `gemini` — quên đổi là hỏng CÂM, xem dưới
+#   STUDIO_OPENAI_API_KEY=sk-...          # LLM trả lời + LLM-judge
+#   STUDIO_OPENROUTER_API_KEY=sk-or-...   # embedding (gemini-embedding-001 @2048); thiếu ⇒ 503
+#
+# (`STUDIO_JUDGE_CACHE_PATH`/`CAP_PATH` KHÔNG nằm trong danh sách này — chúng cần cho MỌI đường
+# `/evaluate`, kể cả stub, nên đã là việc của BƯỚC 1. Nếu bỏ qua 3b thì vẫn phải làm bước 1.)
+#
+# `STUDIO_LLM_PROVIDER` là biến QUYẾT ĐỊNH và là cái dễ sót nhất: nó required-no-default, nên ai
+# copy `.env.example` đều mang theo giá trị `gemini` của file mẫu. Đổi 3 biến kia mà quên dòng
+# này thì `build_llm()` vẫn rẽ `case LlmProvider.GEMINI` (`providers/factory.py`), và vì file mẫu
+# có `STUDIO_GEMINI_API_KEY=changeme` (truthy) nên KHÔNG có 500 "thiếu key" nào nổ — nó chết tận
+# lúc gọi API. `LLMJudge` cũng nhận `build_llm()` (`routes/publish.py:204`), nên chạy nhầm
+# provider thì mọi số đo `gpt-4o-mini` dưới đây KHÔNG áp cho cấu hình bạn đang chạy.
+#
+# KHÔNG cần set `STUDIO_OPENAI_MODEL`: bỏ trống = `gpt-4o-mini`, model duy nhất đo được là PASS
+# (`evalhub#31`: 0.9889 / 1.0000 · PASS 3/3; `o4-mini` cho 0.7556 · FAIL 3/3). Và ĐỪNG khai
+# `STUDIO_OPENAI_BASE_URL=` rỗng: pydantic-settings đọc value rỗng trong `.env` thành `""` chứ
+# KHÔNG phải `None`, mà `""` truyền thẳng vào `AsyncOpenAI(base_url=...)` ⇒ MỌI call LLM chết
+# `APIConnectionError: Connection error.` (đo, openai 3.3.x). Trong `.env.example` dòng đó đã
+# được comment sẵn — chỉ bỏ comment khi thật sự trỏ sang gateway khác.
+#
+# Thiếu `STUDIO_OPENROUTER_API_KEY` gãy CẢ HAI đường, không riêng nút "Chấm điểm": `/evaluate` VÀ
+# `POST /api/agents/{id}/chat` (`routes/chat.py:121` cũng gọi `build_embedding()`) — tức chat demo
+# tắt luôn, không phải chỉ mất điểm số.
+#
+# Quota judge là 100 call/NGÀY (`LLMJudge` cap, đếm trong file `STUDIO_JUDGE_CAP_PATH`). Một lượt
+# "Chấm điểm" 30 case tiêu 8–16 call ⇒ khoảng 6–9 lượt/ngày. Hết quota thì judge tụt nấc
+# exact-match, điểm rơi từ ~0.93 xuống ~0.70 và verdict thành FAIL — tín hiệu duy nhất là một
+# dòng log. Trước buổi demo: xoá file cap đó cho quota về 0.
+
 # 4. Chạy backend (apps/studio) — cửa sổ terminal riêng. Lần khởi động này chạy lifespan = dựng
 # schema (`ensure_all_schemas`) + CẤP QUYỀN DML cho role `studio_app` (`grant_app_privileges`,
 # `app.py:39-40`). PHẢI lên TRƯỚC bước 5: `studio_app` chỉ có quyền INSERT vào `kb.chunks` SAU khi
@@ -238,7 +285,7 @@ uv run python apps/studio/scripts/seed_demo_tenants.py
 # GHI ĐÈ (không nối thêm) `X-Forwarded-For` trước khi tới app.
 uv run uvicorn studio_app.app:create_app --factory --app-dir apps/studio/src --host 127.0.0.1 --port 8000 --reload --no-proxy-headers
 
-# 5. Nạp corpus Callisto vào kb.chunks (42 doc / 140 chunk: ankor 71 · borea 69) — CHẠY TỪ GỐC KIT,
+# 5. Nạp corpus Callisto **2.0** vào kb.chunks (80 doc / 800 chunk: ankor 400 · borea 400) — CHẠY TỪ GỐC KIT,
 # cửa sổ terminal riêng, SAU khi backend (bước 4) đã in "Application startup complete". BẮT BUỘC
 # trước khi demo chat/retrieval. Sau mỗi lần `make test`/`pytest` (fixture truncate `kb.chunks` +
 # `core.tenants`) chỉ cần chạy lại BƯỚC 3 + 5 — KHÔNG phải restart backend (truncate xoá dòng, không
@@ -247,7 +294,20 @@ uv run uvicorn studio_app.app:create_app --factory --app-dir apps/studio/src --h
 # dev-stack DSN dưới đây; KHỚP NGUYÊN VẸN .env.example, role non-owner `studio_app` để RLS WITH CHECK
 # còn cắn. Idempotent — chạy lại không nhân đôi.
 export STUDIO_DATABASE_URL=postgresql://studio_app:changeme@localhost:5432/studio
-uv run python packages/kb/scripts/ingest_callisto.py
+uv run python packages/kb/scripts/ingest_callisto_v2.py
+
+# ⚠️ ĐÚNG script là `..._v2.py`. Bản 1.0 (`ingest_callisto.py`) nạp corpus 140 chunk bằng bộ nhúng
+# bag-of-words; sau cutover 2.0 (`kb#43`) cột là `vector(2048)` và đường truy vấn nhúng bằng
+# `gemini-embedding-001` — dùng script 1.0 thì corpus và query nằm ở HAI không gian vector khác
+# nhau: `recall@3` rơi từ 22/22 xuống 1/22 (đo được), agent trả lời trôi chảy từ chunk sai hoặc từ
+# chối mọi câu, và KHÔNG lỗi nào nổ. `..._v2.py` đọc vector từ cache đã commit nên KHÔNG cần API key.
+# Kiểm sau khi nạp — PHẢI qua superuser `postgres`, KHÔNG dùng DSN vừa export ở trên: `kb.chunks`
+# là `FORCE ROW LEVEL SECURITY` (`studio_kb/schema.py`) và cả `studio_owner` lẫn `studio_app` đều
+# `NOSUPERUSER` (`docker/postgres-init/00-roles.sql`) ⇒ chưa set `app.tenant_id` thì ra 0 dòng, set
+# rồi thì ra 400/tenant — không bao giờ 800:
+#   docker compose exec postgres psql -U postgres -d studio \
+#     -c "select vector_dims(embedding), count(*) from kb.chunks group by 1;"
+#   →  2048 | 800
 
 # 6. Chạy frontend (apps/web) — cửa sổ terminal riêng
 cd apps/web
