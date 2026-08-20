@@ -228,20 +228,37 @@ uv run python apps/studio/scripts/seed_demo_tenants.py
 
 # 3b. CHỈ KHI demo bằng provider THẬT (bắt buộc nếu muốn "Chấm điểm" ra số có nghĩa). Mặc định
 # `.env.example` để `STUDIO_USE_FAKE_PROVIDERS=true` ⇒ LLM và embedding đều là stub: luồng chạy
-# hết, nhưng điểm KHÔNG nói gì về chất lượng thật. Bốn biến dưới đây, thiếu bất kỳ cái nào là
-# hỏng giữa demo (cả bốn đã dựng lại được ở tổng duyệt 20/08):
+# hết, nhưng điểm KHÔNG nói gì về chất lượng thật. NĂM biến dưới đây, thiếu bất kỳ cái nào là
+# hỏng giữa demo (cả năm đã dựng lại được ở tổng duyệt 20/08):
 #
 #   STUDIO_USE_FAKE_PROVIDERS=false
+#   STUDIO_LLM_PROVIDER=openai            # file mẫu ship `gemini` — quên đổi là hỏng CÂM, xem dưới
 #   STUDIO_OPENAI_API_KEY=sk-...          # LLM trả lời + LLM-judge
 #   STUDIO_OPENROUTER_API_KEY=sk-or-...   # embedding (gemini-embedding-001 @2048); thiếu ⇒ 503
-#   STUDIO_JUDGE_CACHE_PATH / STUDIO_JUDGE_CAP_PATH  → đường GHI ĐƯỢC trên máy
+#   STUDIO_JUDGE_CACHE_PATH / STUDIO_JUDGE_CAP_PATH  → đường TUYỆT ĐỐI, GHI ĐƯỢC trên máy
+#
+# `STUDIO_LLM_PROVIDER` là biến QUYẾT ĐỊNH và là cái dễ sót nhất: nó required-no-default, nên ai
+# copy `.env.example` đều mang theo giá trị `gemini` của file mẫu. Đổi 4 biến kia mà quên dòng
+# này thì `build_llm()` vẫn rẽ `case LlmProvider.GEMINI` (`providers/factory.py`), và vì file mẫu
+# có `STUDIO_GEMINI_API_KEY=changeme` (truthy) nên KHÔNG có 500 "thiếu key" nào nổ — nó chết tận
+# lúc gọi API. `LLMJudge` cũng nhận `build_llm()` (`routes/publish.py:204`), nên chạy nhầm
+# provider thì mọi số đo `gpt-4o-mini` dưới đây KHÔNG áp cho cấu hình bạn đang chạy.
 #
 # Hai biến judge: mặc định trong code là `/app/state/...` (đúng cho image, sai cho máy thật) —
 # chạy ngoài container mà không override thì lần gọi judge ĐẦU TIÊN ném `PermissionError` thành
-# 500. `.env.example` đã có sẵn 2 dòng, chỉ cần đổi sang đường trong repo/nhà bạn.
+# 500. Đường phải TUYỆT ĐỐI: đường tương đối giải theo CWD, nên chạy `uv run` từ hai thư mục khác
+# nhau cho HAI file cap ⇒ cap 100/ngày âm thầm thành 200 mà không dòng code nào sai.
 #
 # KHÔNG cần set `STUDIO_OPENAI_MODEL`: bỏ trống = `gpt-4o-mini`, model duy nhất đo được là PASS
-# (`evalhub#31`: 0.9889 / 1.0000 · PASS 3/3; `o4-mini` cho 0.7556 · FAIL 3/3).
+# (`evalhub#31`: 0.9889 / 1.0000 · PASS 3/3; `o4-mini` cho 0.7556 · FAIL 3/3). Và ĐỪNG khai
+# `STUDIO_OPENAI_BASE_URL=` rỗng: pydantic-settings đọc value rỗng trong `.env` thành `""` chứ
+# KHÔNG phải `None`, mà `""` truyền thẳng vào `AsyncOpenAI(base_url=...)` ⇒ MỌI call LLM chết
+# `APIConnectionError: Connection error.` (đo, openai 3.3.x). Trong `.env.example` dòng đó đã
+# được comment sẵn — chỉ bỏ comment khi thật sự trỏ sang gateway khác.
+#
+# Thiếu `STUDIO_OPENROUTER_API_KEY` gãy CẢ HAI đường, không riêng nút "Chấm điểm": `/evaluate` VÀ
+# `POST /api/agents/{id}/chat` (`routes/chat.py:121` cũng gọi `build_embedding()`) — tức chat demo
+# tắt luôn, không phải chỉ mất điểm số.
 #
 # Quota judge là 100 call/NGÀY (`LLMJudge` cap, đếm trong file `STUDIO_JUDGE_CAP_PATH`). Một lượt
 # "Chấm điểm" 30 case tiêu 8–16 call ⇒ khoảng 6–9 lượt/ngày. Hết quota thì judge tụt nấc
@@ -276,7 +293,13 @@ uv run python packages/kb/scripts/ingest_callisto_v2.py
 # `gemini-embedding-001` — dùng script 1.0 thì corpus và query nằm ở HAI không gian vector khác
 # nhau: `recall@3` rơi từ 22/22 xuống 1/22 (đo được), agent trả lời trôi chảy từ chunk sai hoặc từ
 # chối mọi câu, và KHÔNG lỗi nào nổ. `..._v2.py` đọc vector từ cache đã commit nên KHÔNG cần API key.
-# Kiểm sau khi nạp:  select count(*), vector_dims(embedding) from kb.chunks;  →  800 | 2048
+# Kiểm sau khi nạp — PHẢI qua superuser `postgres`, KHÔNG dùng DSN vừa export ở trên: `kb.chunks`
+# là `FORCE ROW LEVEL SECURITY` (`studio_kb/schema.py`) và cả `studio_owner` lẫn `studio_app` đều
+# `NOSUPERUSER` (`docker/postgres-init/00-roles.sql`) ⇒ chưa set `app.tenant_id` thì ra 0 dòng, set
+# rồi thì ra 400/tenant — không bao giờ 800:
+#   docker compose exec postgres psql -U postgres -d studio \
+#     -c "select vector_dims(embedding), count(*) from kb.chunks group by 1;"
+#   →  2048 | 800
 
 # 6. Chạy frontend (apps/web) — cửa sổ terminal riêng
 cd apps/web
