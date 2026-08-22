@@ -12,7 +12,9 @@ REGISTRY: dict[NodeType, type[NodeExecutor]] = {tất cả 6 NodeType → class 
 
 `interpreter.run()` xây **6 instance executor cụ thể** mỗi lần gọi (constructor-DI, không factory
 chung): `KbRetrieveExecutor(kb_search)`, `LlmStepExecutor(llm, embedding)`,
-`ToolCallExecutor(WhitelistToolDispatch(recipe.agent_config.tool_whitelist))`, `ConditionExecutor()`,
+`ToolCallExecutor(_WhitelistGuardedDispatch(tool_dispatch if tool_dispatch is not None else
+WhitelistToolDispatch(recipe.agent_config.tool_whitelist), recipe.agent_config.tool_whitelist))`,
+`ConditionExecutor()`,
 `HitlPauseExecutor()`, `EndExecutor()`. Walk bắt đầu từ `_find_start_node_id(recipe.dag)` — node duy
 nhất không có edge nào trỏ tới; **không** re-validate cấu trúc (đã tin `graph_lint`, Day 12 DEC-A).
 
@@ -69,7 +71,7 @@ nội bộ (không raise ngoài ý muốn) trừ `KbRetrieveExecutor` (raise `Pe
 | `KbRetrieveExecutor` | **Implement thật** | Fail-closed `PermissionError` nếu `tenant_id` post-override không phải UUID (`executors.py:174`) |
 | `LlmStepExecutor` | **Implement thật** | Trích citation bằng regex `[chunk_id]`, chỉ giữ citation vừa được cite VÀ có trong `retrieved_chunks` — không fallback về raw extraction |
 | `ConditionExecutor` | **Implement thật** (D14) | Grammar `"<field> <op> <literal>"`, KHÔNG BAO GIỜ raise — mọi lỗi thành `reason` string; `result` là `bool` ⟺ `reason == "ok"` |
-| `ToolCallExecutor` | **1 nhánh còn seam thật** | `dispatcher=None` (default) → raise `NotImplementedError` — chỉ đường walk thật (interpreter luôn wire `WhitelistToolDispatch`) mới không chạm nhánh này |
+| `ToolCallExecutor` | **1 nhánh còn seam thật** | `dispatcher=None` (default) → raise `NotImplementedError` — chỉ đường walk thật (interpreter luôn wire MỘT dispatcher: `tool_dispatch` nếu caller tiêm, ngược lại `WhitelistToolDispatch`, và **luôn** bọc trong `_WhitelistGuardedDispatch` — engine#35) mới không chạm nhánh này |
 | `HitlPauseExecutor` | **Implement thật, nhưng chưa pause thật** | Trả `{"paused": True, "status": "pending_approval"}` — walk vẫn tiếp tục ngay, KHÔNG dừng/chờ approval thật (wiring pause/resume còn ngoài scope hiện tại) |
 | `EndExecutor` | **Implement thật** | `{"terminated": True}` — tín hiệu duy nhất khiến walk `break` |
 

@@ -46,6 +46,10 @@ services:
     environment:
       STUDIO_DATABASE_URL: ${STUDIO_DATABASE_URL:-postgresql://studio_app:changeme@postgres:5432/studio}
       STUDIO_DATABASE_URL_ADMIN: ${STUDIO_DATABASE_URL_ADMIN:-postgresql://studio_owner:changeme@postgres:5432/studio}
+      # evalhub#37 — chỉ để chạy CLI chấm điểm TRONG container (`python -m studio_evalhub.run_report`).
+      # App runtime KHÔNG đọc biến này; `settings.py` không khai nó, nên nó không thể lọt vào đường
+      # request. Role studio_scorer có BYPASSRLS + SELECT trên đúng obs.trace_events.
+      STUDIO_DATABASE_URL_SCORER: ${STUDIO_DATABASE_URL_SCORER:-postgresql://studio_scorer:changeme@postgres:5432/studio}
       STUDIO_GEMINI_API_KEY: ${STUDIO_GEMINI_API_KEY:-changeme}
       # required, KHÔNG default (đúng tinh thần DEC-1 xuyên mọi tầng — pydantic Settings đã
       # required-no-default, compose-level default sẽ âm thầm che mất field đó, phá đúng chủ ý

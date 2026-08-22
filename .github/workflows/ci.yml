@@ -58,6 +58,8 @@ jobs:
     env:
       STUDIO_DATABASE_URL: postgresql://studio_app:changeme@localhost:5433/studio_test
       STUDIO_DATABASE_URL_ADMIN: postgresql://studio_owner:changeme@localhost:5433/studio_test
+      # evalhub#37 — role BYPASSRLS cho 2 hàm đọc-xuyên-tenant của bộ chấm.
+      STUDIO_DATABASE_URL_SCORER: postgresql://studio_scorer:changeme@localhost:5433/studio_test
       # CI-only, không phải secret thật — apps_app.settings.Settings.jwt_secret bắt buộc (không
       # default) từ khi có JWT thật. Thiếu biến này thì test (agentcore-studio-app, ...) đỏ, kể cả
       # test cũ không liên quan JWT (Settings() validate hết field bắt buộc lúc khởi tạo). Đã vá
@@ -116,6 +118,8 @@ jobs:
     env:
       STUDIO_DATABASE_URL: postgresql://studio_app:changeme@localhost:5433/studio_test
       STUDIO_DATABASE_URL_ADMIN: postgresql://studio_owner:changeme@localhost:5433/studio_test
+      # evalhub#37 — role BYPASSRLS cho 2 hàm đọc-xuyên-tenant của bộ chấm.
+      STUDIO_DATABASE_URL_SCORER: postgresql://studio_scorer:changeme@localhost:5433/studio_test
       # CI-only, không phải secret thật — apps_app.settings.Settings.jwt_secret bắt buộc (không
       # default) từ khi có JWT thật. Thiếu biến này thì test (agentcore-studio-app, ...) đỏ, kể cả
       # test cũ không liên quan JWT (Settings() validate hết field bắt buộc lúc khởi tạo). Đã vá
