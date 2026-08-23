@@ -268,130 +268,31 @@ git submodule update --init --recursive
 
 # 1. Cài dependency Python + copy env mẫu
 make setup
-cp .env.example .env
 # STUDIO_JWT_SECRET >= 32 ký tự (raise ValidationError nếu ngắn hơn) — sinh khoá thật bằng
 # `openssl rand -hex 32`, đừng dùng nguyên placeholder cho môi trường thật.
 # Bỏ comment STUDIO_JUDGE_CACHE_PATH/CAP_PATH, điền đường TUYỆT ĐỐI ghi được trên máy bạn. Cần
 # ngay từ bước này (LLMJudge dựng vô điều kiện kể cả fake providers) — thiếu ⇒ `PermissionError`
-# (Linux) / `OSError: Read-only file system` (macOS) thành 500 CHƯA BẮT khi bấm "Chấm điểm"; đường
-# tương đối (khác CWD) làm counter quota tách đôi âm thầm.
 
-# 2. Bật Postgres — dev stack (docker-compose.yml, port 5432), khớp mặc định .env.example, không
-# cần sửa STUDIO_DATABASE_URL. (docker-compose.test.yml là stack RIÊNG cho test/CI, port 5433.)
-docker compose up -d
+# 2. Chạy backend — cửa sổ terminal riêng.
+make dev
 
-# 3. Seed 2 tenant demo (ankor/borea) — bắt buộc trước lần chạy đầu và sau mỗi `make test`/`pytest`
-# (fixture truncate cả `core.tenants`). CHẠY TỪ GỐC KIT — Settings() tìm `.env` theo CWD.
-uv run python apps/studio/scripts/seed_demo_tenants.py
+# 3. Ingest Data — Cửa sổ riêng
+make ingestDB
 
-# 3b. CHỈ KHI demo bằng provider THẬT (bắt buộc để "Chấm điểm" ra số có nghĩa). Mặc định
-# STUDIO_USE_FAKE_PROVIDERS=true (stub) ⇒ luồng chạy nhưng điểm không phản ánh chất lượng thật.
-# Bốn biến sau, thiếu 1 là hỏng giữa demo:
-#
-#   STUDIO_USE_FAKE_PROVIDERS=false
-#   STUDIO_LLM_PROVIDER=openai            # file mẫu ship `gemini` — hay bị quên, hỏng CÂM (không 500)
-#   STUDIO_OPENAI_API_KEY=sk-...          # LLM trả lời + LLM-judge
-#   STUDIO_OPENROUTER_API_KEY=sk-or-...   # embedding gemini-embedding-001@2048; thiếu ⇒ 503 cả /evaluate lẫn /chat
-#
-# (STUDIO_JUDGE_CACHE_PATH/CAP_PATH đã set ở bước 1 — cần cho mọi đường /evaluate, không riêng 3b.)
-# STUDIO_OPENAI_MODEL để trống = gpt-4o-mini (model duy nhất đo PASS: evalhub#31 0.9889/1.0000;
-# o4-mini FAIL). ĐỪNG khai STUDIO_OPENAI_BASE_URL= rỗng — "" khác None, làm mọi call LLM chết
-# APIConnectionError.
-# Judge quota 100 call/ngày — 1 lượt "Chấm điểm" tốn 8-16 call (~6-9 lượt/ngày); xoá file cap
-# trước demo để về 0.
-
-# 4. Chạy backend (apps/studio) — cửa sổ terminal riêng. Lifespan dựng schema + cấp quyền DML cho
-# studio_app — PHẢI lên TRƯỚC bước 5 (ingest trước sẽ gãy "permission denied for schema kb").
-# `--no-proxy-headers`: uvicorn mặc định tin X-Forwarded-For từ mọi kết nối 127.0.0.1, cho phép né
-# rate-limit login bằng header giả — chỉ bỏ cờ này khi có reverse proxy thật GHI ĐÈ header đó.
-uv run uvicorn studio_app.app:create_app --factory --app-dir apps/studio/src --host 127.0.0.1 --port 8000 --reload --no-proxy-headers
-
-# 5. Nạp corpus Callisto 2.0 vào kb.chunks (80 doc/800 chunk: ankor 400 · borea 400) — CHẠY TỪ GỐC
-# KIT, cửa sổ terminal riêng, SAU khi backend (bước 4) in "Application startup complete". Sau mỗi
-# `make test`/`pytest` (truncate kb.chunks) chỉ cần chạy lại BƯỚC 3 + 5, không restart backend.
-export STUDIO_DATABASE_URL=postgresql://studio_app:changeme@localhost:5432/studio
-uv run python packages/kb/scripts/ingest_callisto_v2.py
-
-# ⚠️ ĐÚNG script là `..._v2.py`. Bản 1.0 (`ingest_callisto.py`) dùng bộ nhúng bag-of-words — corpus
-# và query nằm ở HAI không gian vector khác nhau, recall@3 rơi từ 22/22 xuống 1/22, KHÔNG lỗi nào
-# nổ. `..._v2.py` đọc vector từ cache đã commit, không cần API key.
-# Kiểm (qua superuser postgres — studio_app/studio_owner đều NOSUPERUSER, RLS chặn thấy full 800):
-#   docker compose exec postgres psql -U postgres -d studio \
-#     -c "select vector_dims(embedding), count(*) from kb.chunks group by 1;"
-#   →  2048 | 800
-
-# 6. Chạy frontend (apps/web) — cửa sổ terminal riêng
-cd apps/web
-corepack enable pnpm && pnpm install   # KHÔNG dùng npm install — xem cảnh báo pnpm/npm ở trên
-pnpm dev   # mặc định http://127.0.0.1:5173
+# 4. Chạy frontend (apps/web) — cửa sổ terminal riêng
+make frontend
 ```
 
-### Đăng nhập — chỉ còn 1 đường, bằng mật khẩu thật
+### Đăng nhập
 
-`POST /api/auth/demo-login` (đăng nhập chỉ bằng email, không mật khẩu) đã bị **xoá hoàn toàn**
-khỏi `apps/studio/src/studio_app/routes/auth.py`. Không còn bảng tài khoản demo nào để đăng nhập
-ngay — mọi tài khoản (kể cả để tự thử/demo) phải được **tạo trước** qua `core.users` (mật khẩu
-băm bcrypt thật), theo đúng 1 trong 2 cách dưới.
-
-**Cách A — bootstrap superadmin rồi tự tạo công ty MỚI qua UI** (công ty trống, không có sẵn corpus
-Callisto — dùng để thử luồng quản trị, không dùng để thử canvas/chat có nội dung thật):
-
-```bash
-export STUDIO_DATABASE_URL_ADMIN=postgresql://studio_owner:changeme@localhost:5432/studio
-export STUDIO_DATABASE_URL=postgresql://studio_app:changeme@localhost:5432/studio
-export STUDIO_SUPERADMIN_EMAIL=superadmin@agentcore.internal
-export STUDIO_SUPERADMIN_PASSWORD=<mật khẩu tự chọn, tối thiểu 8 ký tự>
-uv run python apps/studio/scripts/seed_superadmin.py
-```
-
-Đăng nhập bằng `STUDIO_SUPERADMIN_EMAIL`/`STUDIO_SUPERADMIN_PASSWORD` ở `http://127.0.0.1:5173` —
-màn hình DUY NHẤT của superadmin là "Tạo công ty mới" (`POST /api/admin/companies`). Tạo xong,
-đăng xuất rồi đăng nhập bằng email/mật khẩu admin vừa tạo — tài khoản đó có tab "Quản trị" để tự
-tạo thêm nhân viên (`POST /api/admin/users`, chọn roles qua checkbox).
-
-**Cách B — gán tài khoản thật vào tenant `ankor`/`borea` đã seed sẵn** (có ngay corpus Callisto
-71/69 chunk từ bước 5 — dùng cách này nếu muốn thử canvas/chat ra nội dung thật). `create_company`
-LUÔN tạo tenant MỚI (UUID ngẫu nhiên), không có route nào gắn thẳng vào 1 trong 2 tenant có sẵn
-này — chèn thẳng 1 dòng `core.users` bằng script nhỏ:
-
-```bash
-# Chạy từ apps/studio (`uv run python` cần thấy được package `studio_app`).
-cd apps/studio
-uv run python - <<'PY'
-import asyncio, sys
-# Windows: psycopg async từ chối ProactorEventLoop mặc định — cùng workaround
-# apps/studio/tests/conftest.py và scripts/seed_superadmin.py đã dùng. Không cần trên Linux/macOS.
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
-from studio_app.jwt_auth import hash_password
-from studio_app.core._db import get_admin_pool, close_pools
-
-ANKOR_ID = "a0000000-0000-0000-0000-000000000001"  # packages/workbench/src/studio_workbench/builder.py
-
-async def main() -> None:
-    pool = await get_admin_pool()
-    async with pool.connection() as conn:
-        await conn.execute(
-            "INSERT INTO core.users (tenant_id, email, password_hash, roles) VALUES (%s, %s, %s, %s) "
-            "ON CONFLICT (email) DO NOTHING",
-            (ANKOR_ID, "admin@ankor.vn", hash_password("doi-mat-khau-nay-truoc-khi-dung-that"), ["admin", "public", "hr", "finance", "engineering"]),
-        )
-    await close_pools()
-
-asyncio.run(main())
-PY
-```
-
-Đăng nhập bằng `admin@ankor.vn` / mật khẩu vừa đặt — canvas thấy đủ, Test ra chunk KB thật (không
-rỗng, vì role có đủ cả 4 role nội dung). Cùng cách này, đổi `ANKOR_ID`/email/roles để tạo tài khoản
-chỉ có 1 role nội dung (thử ca "chỉ thấy Chat, không thấy canvas" — role thiếu `"admin"`).
-
-> 3 mục UI dưới đây (canvas/trace/chat) khớp đúng con trỏ `apps/web` đang ghim ở PR này
-> (`0e4bd1e`, web#10). `apps/web` main đã đi trước ít nhất 1 commit (`9688e6f`, web#11 — gộp tab
-> "Agent đã publish" vào Canvas qua `OpenAgentModal.tsx`, đổi panel role thành "Thử vai trò"). Nếu
-> con trỏ kit đã bump qua khỏi `0e4bd1e` lúc bạn đọc, tự kiểm lại 3 chỗ trước khi tin: tab
-> "Agent đã publish"/Rollback, khối "Test agent với role", và cách nạp 1 recipe cũ vào canvas.
+#### 1. Superadmin:
+##### Nhiệm vụ chính: Tạo tài khoản admin cho công ty 
+##### Username và Password: Setup trong .vn
+#### 2. Admin:
+##### Nhiệm vụ chính: Tạo tài khoản admin cho công ty 
+##### Username và Password: 
+###### Tại apps/stdudio/scripts/seed_demo_tenants.py (2 tài khoản cho công ty ankor và borea)
+###### Tạo bằng tài khoản superadmin.  
 
 ### Dựng recipe trên canvas
 
