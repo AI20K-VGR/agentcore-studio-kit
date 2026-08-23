@@ -24,9 +24,60 @@ plans/260717-1516-studio-kit-template/research/studio-spec-and-workspace.md (R-S
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Any
+from uuid import UUID
+
 import pytest
+from psycopg import sql
+from studio_contracts import (
+    AgentConfig,
+    Dag,
+    Edge,
+    KbBinding,
+    Node,
+    NodeType,
+    Recipe,
+    ScorecardThreshold,
+    Tokens,
+    TraceEvent,
+)
+from studio_evalhub.agent_runner import AgentAnswer, CaseRun
+from studio_evalhub.golden_case import GoldenSet
+from studio_evalhub.golden_loader import load_golden_set
+from studio_evalhub.harness import EvalHarness
+from studio_kb.doc_factory import TENANT_IDS
+from studio_workbench.publish import publish, recipe_hash
 
 E2E_PENDING_REASON = "e2e pending — owner fills after 4 quadrants land (P5-P8 business logic)"
+
+# ── Bước 7 (money-shot AIE-2) — hằng số dùng chung ────────────────────────────────────────────
+_GOLDEN_30 = (
+    Path(__file__).resolve().parents[2]
+    / "packages"
+    / "kb"
+    / "src"
+    / "studio_kb"
+    / "golden"
+    / "callisto-golden-30-v1.yaml"
+)
+_REF = "callisto-golden-30-v1"
+
+# Ngưỡng của RECIPE (`workbench/builder.py`), không phải của bộ chấm — viết ra để phép đo đọc được,
+# không phải để sở hữu chúng (`DEC-D16-05`). Bài này **không** đụng hai số này: hạ ngưỡng để đổi
+# verdict là đúng thứ `DEC-D20-03` cấm, và cũng làm bài mất sạch ý nghĩa.
+_THRESHOLD_SUCCESS = 0.9
+_THRESHOLD_CITATION = 0.95
+
+# Câu lệnh phân biệt bản TỐT với bản HẠ. `_RunnerTheoInstructions` đọc đúng cụm này — nó đóng vai
+# "agent hành xử theo prompt", tức thứ người dùng thật sự sửa khi họ làm hỏng một agent.
+_MARKER_TOT = "TRÍCH DẪN NGUỒN"
+_INSTRUCTIONS_TOT = (
+    "Trả lời dựa trên tài liệu được truy xuất. Luôn TRÍCH DẪN NGUỒN. "
+    "Từ chối khi câu hỏi nằm ngoài phạm vi kho tài liệu của người hỏi."
+)
+_INSTRUCTIONS_HA = "Trả lời ngắn gọn."
 
 
 def test_step_1_form_creates_agent() -> None:
@@ -88,17 +139,190 @@ def test_step_6_eval_gate_pass_then_publish() -> None:
     pytest.skip(reason=E2E_PENDING_REASON)
 
 
-def test_step_7_regression_blocks_gate_and_rolls_back_money_shot() -> None:
+def _recipe(agent_id: str, instructions: str) -> Recipe:
+    """DAG tối thiểu qua đủ 7 luật `graph_lint` (`publish()` gọi nó ở cổng 1). Chỉ `instructions`
+    đổi giữa hai bản — mọi field khác giữ nguyên để `recipe_hash` chỉ lệch **vì** thứ đang đo."""
+    nodes = [
+        Node(id="n_kb", type=NodeType.KB_RETRIEVE, params={"query": "q", "section_roles": ["public"], "top_k": 5}),
+        Node(id="n_llm", type=NodeType.LLM_STEP, params={}),
+        Node(id="n_end", type=NodeType.END, params={}),
+    ]
+    return Recipe(
+        agent_id=agent_id,
+        tenant_id=TENANT_IDS["ankor"],
+        agent_config=AgentConfig(instructions=instructions, model="fake", tool_whitelist=[]),
+        dag=Dag(nodes=nodes, edges=[Edge(from_="n_kb", to="n_llm"), Edge(from_="n_llm", to="n_end")]),
+        kb_binding=KbBinding(kb_id="kb-1", scope="ankor/public"),
+        golden_set_ref=_REF,
+        scorecard_threshold=ScorecardThreshold(success=_THRESHOLD_SUCCESS, citation_accuracy=_THRESHOLD_CITATION),
+    )
+
+
+def _trace_event(tenant_id: UUID, citations: list[str], chunks: list[dict[str, object]] | None = None) -> TraceEvent:
+    return TraceEvent(
+        event_id="e1",
+        run_id="r1",
+        agent_id="a1",
+        tenant_id=tenant_id,
+        node_id="n_kb",
+        node_type=NodeType.KB_RETRIEVE,
+        ts="2026-08-23T00:00:00.000000",
+        inputs_hash="h",
+        outputs={"chunks": chunks if chunks is not None else []},
+        tokens=Tokens(prompt=0, completion=0),
+        cost=0.0,
+        citations=citations,
+    )
+
+
+class _RunnerTheoInstructions:
+    """Agent double **hành xử theo `instructions`** — mắt xích mà hai file gate-2 hiện có không dựng.
+
+    Dựng từ `recipe.agent_config.instructions` chứ không nhận nó trong `run_case`, vì
+    `AgentRunner.run_case` cấu trúc mà nói **không thấy recipe** (`agent_runner.py`) — runner được
+    composition root dựng theo từng recipe, đúng như `routes/publish.py::_evaluate` dựng
+    `EngineAgentRunner(recipe=recipe)`. Double này mô phỏng đúng quan hệ đó, không phải né nó.
+
+    Bản **tốt** (instructions còn câu trích-dẫn-nguồn): trả lời đúng theo golden, trích đúng nguồn,
+    và **từ chối** đúng case cần từ chối. Bản **hạ**: trả lời chung chung, **không** trích nguồn, và
+    — chỗ nguy hiểm nhất — **thôi từ chối** ở case đáng từ chối. Đó là dạng hỏng thật khi ai đó gọt
+    prompt cho "ngắn gọn": agent mất luôn hàng rào phạm vi chứ không chỉ mất chất lượng văn phong."""
+
+    def __init__(self, golden: GoldenSet, tenant_map: Mapping[str, UUID], instructions: str) -> None:
+        self._tot = _MARKER_TOT in instructions
+        self._fixtures: dict[tuple[str, UUID, tuple[str, ...]], CaseRun] = {}
+        for case in golden.cases:
+            tenant_id = tenant_map[case.tenant]
+            # Khoá 3 thành phần — golden-30 có cặp trùng `(query, tenant_id)` khác `section_roles`
+            # (trục T6); khoá 2 thành phần sẽ nuốt một nửa mỗi cặp.
+            key = (case.query, tenant_id, tuple(case.section_roles))
+            role = case.section_roles[0] if case.section_roles else "public"
+            chunk_id = f"{case.tenant}-handbook-000#c1"
+            chunk: dict[str, object] = {
+                "chunk_id": chunk_id,
+                "tenant_id": str(tenant_id),
+                "section_role": role,
+                "score": 0.5,
+                "text": "t",
+            }
+            if self._tot:
+                if case.expects_refusal:
+                    answer = AgentAnswer(answer="Tôi không thể trả lời câu hỏi này.", citations=[], refused=True)
+                    events = [_trace_event(tenant_id, [chunk_id], chunks=[chunk])]
+                else:
+                    answer = AgentAnswer(
+                        answer=f"Theo tài liệu, {case.expected}.",
+                        citations=list(case.expected_citation),
+                        refused=False,
+                    )
+                    events = [_trace_event(tenant_id, list(case.expected_citation))]
+            else:
+                # Bản hạ: không trích nguồn, và KHÔNG từ chối kể cả khi đáng từ chối.
+                answer = AgentAnswer(answer="Bạn nên xem lại tài liệu nội bộ.", citations=[], refused=False)
+                events = [_trace_event(tenant_id, [], chunks=[chunk])]
+            self._fixtures[key] = CaseRun(answer=answer, events=events)
+
+    async def run_case(self, *, agent_id: str, query: str, tenant_id: UUID, section_roles: list[str]) -> CaseRun:
+        del agent_id
+        return self._fixtures[(query, tenant_id, tuple(section_roles))]
+
+
+async def _bind_tenant(conn: Any, tenant_id: UUID) -> None:
+    """`wb.recipes` có `ENABLE`+`FORCE` RLS — không set biến phiên thì ghi/đọc 0 row, im lặng."""
+    await conn.execute(sql.SQL("SET LOCAL app.tenant_id = {}").format(sql.Literal(str(tenant_id))))
+
+
+async def _rows(pool: Any, agent_id: str) -> list[tuple[int, str]]:
+    async with pool.connection() as conn, conn.transaction():
+        await _bind_tenant(conn, TENANT_IDS["ankor"])
+        cur = await conn.execute(
+            "SELECT version, status FROM wb.recipes WHERE agent_id = %s ORDER BY version",
+            (agent_id,),
+        )
+        return [(int(v), str(s)) for v, s in await cur.fetchall()]
+
+
+async def _cham(recipe: Recipe, golden: GoldenSet) -> Any:
+    """Chấm recipe bằng `EvalHarness` THẬT — `Scorecard` ra từ `compute_scorecard`, không dựng tay.
+
+    `recipe_hash=` truyền vào để qua được cổng 2/3 của `publish()`, nên thứ quyết định ở cổng 4 là
+    `verdict` chứ không phải hash — cùng lý do `test_gate2_publish_money_shot.py` bài 2/3 phải làm
+    vậy."""
+    return await EvalHarness().run(
+        recipe.agent_id,
+        _REF,
+        golden_set_path=_GOLDEN_30,
+        runner=_RunnerTheoInstructions(golden, TENANT_IDS, recipe.agent_config.instructions),
+        tenant_ids=TENANT_IDS,
+        threshold_success=_THRESHOLD_SUCCESS,
+        threshold_citation_accuracy=_THRESHOLD_CITATION,
+        recipe_hash=recipe_hash(recipe),
+    )
+
+
+async def test_step_7_regression_blocks_gate_and_rolls_back_money_shot(pool: Any) -> None:
     """Step 7 (AIE-2 eval-gate + SWE publish/rollback wiring) — MONEY-SHOT.
 
     Degrading `agent_config.instructions` (a deliberate regression) and re-running Eval must
     produce a FAILing scorecard verdict, and that FAIL must be a REAL hard gate: Publish is
     BLOCKED and the previously-published version is rolled back automatically — never just a
-    warning banner a human can click past. Real assertion (owner fills): after the instructions
-    regression, scorecard.gate.verdict == FAIL; a subsequent publish attempt on that recipe
-    version is rejected (e.g. 409/403, not silently accepted); the endpoint continues serving the
-    prior good version (rollback), not the degraded one."""
-    pytest.skip(reason=E2E_PENDING_REASON)
+    warning banner a human can click past.
+
+    ## Mắt xích bài này thêm vào — KHÔNG trùng hai file gate-2 đã có
+
+    | File | Khoá đoạn nào của chuỗi |
+    |---|---|
+    | `apps/studio/tests/test_gate2_publish_money_shot.py` | `verdict` → chặn publish + rollback (verdict **cho sẵn**) |
+    | `apps/studio/tests/test_gate2_verdict_from_live_spine.py` | chất lượng **runner** → `verdict` (đổi runner) |
+    | **bài này** | **`instructions` → chất lượng → `verdict` → chặn + bản cũ vẫn phục vụ** |
+
+    Hai file kia chứng minh từng nửa; không file nào nối chuỗi từ **thứ con người thật sự sửa**.
+    Money-shot bước 7 nói về một **regression do người gây ra**, nên mắt xích `instructions` là
+    phần không thể thiếu — thiếu nó thì bài chỉ chứng minh cổng đọc được một field.
+
+    ## Chạy HAI CHIỀU, và đó là điều kiện chứ không phải cho đủ
+
+    `FAIL` là giá trị **dễ trúng nhất**: runner chết, golden lệch, harness hỏng, hay
+    `compute_scorecard` trả hằng `"FAIL"` — mọi thứ hỏng đều ra `FAIL`. Một bài chỉ assert chiều hạ
+    sẽ **xanh với tất cả những thứ đó**, và khi đó nó chứng minh *cổng có chặn*, **không** chứng minh
+    *cổng chặn vì chất lượng*. Chiều PASS là đối chứng bắt buộc.
+
+    Bài này **không** đụng ngưỡng (`0.9/0.95` giữ nguyên, `DEC-D20-03`): thứ được đổi giữa hai chiều
+    là `instructions`, đúng một biến."""
+    golden = load_golden_set(_GOLDEN_30, expect_ref=_REF)
+    agent_id = "e2e-step7-instructions-regression"
+
+    # ── Chiều 1: bản TỐT ⇒ PASS ⇒ publish thành công ──────────────────────────────────────────
+    tot = _recipe(agent_id, _INSTRUCTIONS_TOT)
+    sc_tot = await _cham(tot, golden)
+    assert sc_tot.gate.verdict == "PASS", (
+        f"bản tốt phải PASS, nhận {sc_tot.gate.verdict!r} "
+        f"(success={sc_tot.aggregate.success_rate}, citation={sc_tot.aggregate.citation_accuracy})"
+    )
+    async with pool.connection() as conn, conn.transaction():
+        await _bind_tenant(conn, TENANT_IDS["ankor"])
+        await publish(tot, sc_tot, conn)
+    assert await _rows(pool, agent_id) == [(1, "published")]
+
+    # ── Chiều 2: HẠ instructions ⇒ FAIL ⇒ publish bị chặn ─────────────────────────────────────
+    ha = _recipe(agent_id, _INSTRUCTIONS_HA)
+    sc_ha = await _cham(ha, golden)
+    assert sc_ha.gate.verdict == "FAIL", "hạ instructions mà verdict không lật ⇒ cổng không đo chất lượng"
+    # Điểm phải tụt THẬT, không chỉ verdict lật — verdict là hệ quả, số mới là bằng chứng.
+    assert sc_ha.aggregate.success_rate < sc_tot.aggregate.success_rate
+
+    with pytest.raises(ValueError, match=r"gate\.verdict='FAIL'") as bat:
+        async with pool.connection() as conn, conn.transaction():
+            await _bind_tenant(conn, TENANT_IDS["ankor"])
+            await publish(ha, sc_ha, conn)
+
+    # Chặn phải VÌ verdict. `publish()` nội suy `agent_id` vào thông điệp nên `match="verdict"` trần
+    # có thể khớp vào chính tên nhánh mình đặt — assert phủ định này mới là thứ phân biệt cổng 4 với
+    # cổng 2/3 (tiền lệ: `test_gate2_publish_money_shot.py` bài 2, mutant `M-G4`).
+    assert "recipe_hash" not in str(bat.value), "chặn sai cổng: thông điệp nói recipe_hash, không phải verdict"
+
+    # Bản tốt VẪN phục vụ, bản hạ KHÔNG bao giờ được ghi ⇒ rollback đã chạy, không phải "chặn rồi bỏ đấy".
+    assert await _rows(pool, agent_id) == [(1, "published")]
 
 
 def test_step_8_hitl_pause_resumes_after_approval() -> None:
