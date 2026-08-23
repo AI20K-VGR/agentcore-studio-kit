@@ -152,8 +152,11 @@ async def _run(llm: object, items: list[KbSearchResultItem]) -> list[TraceEvent]
 
 def _item(chunk_id: str) -> KbSearchResultItem:
     return KbSearchResultItem(
-        chunk_id=chunk_id, text="Nhân viên chính thức được 12 ngày phép.", score=0.9,
-        tenant_id=_TENANT, section_role="public",
+        chunk_id=chunk_id,
+        text="Nhân viên chính thức được 12 ngày phép.",
+        score=0.9,
+        tenant_id=_TENANT,
+        section_role="public",
     )
 
 
