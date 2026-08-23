@@ -266,8 +266,12 @@ cd agentcore-studio-kit
 # Đã lỡ clone KHÔNG kèm submodule? Sửa tại chỗ, không cần clone lại:
 git submodule update --init --recursive
 
-# 1. Cài dependency Python + copy env mẫu
+# 1. Cài dependency Python + tạo env mẫu (không ghi đè `.env` hiện có)
 make setup
+# Điền các giá trị local vào `.env`, đặc biệt là credential superadmin.
+# Không commit `.env` hoặc password thật.
+# STUDIO_SUPERADMIN_EMAIL=superadmin@agentcore.internal
+# STUDIO_SUPERADMIN_PASSWORD=<mật khẩu tự chọn, tối thiểu 8 ký tự>
 # STUDIO_JWT_SECRET >= 32 ký tự (raise ValidationError nếu ngắn hơn) — sinh khoá thật bằng
 # `openssl rand -hex 32`, đừng dùng nguyên placeholder cho môi trường thật.
 # Bỏ comment STUDIO_JUDGE_CACHE_PATH/CAP_PATH, điền đường TUYỆT ĐỐI ghi được trên máy bạn. Cần
@@ -285,14 +289,23 @@ make frontend
 
 ### Đăng nhập
 
-#### 1. Superadmin:
-##### Nhiệm vụ chính: Tạo tài khoản admin cho công ty 
-##### Username và Password: Setup trong .vn
-#### 2. Admin:
-##### Nhiệm vụ chính: Tạo tài khoản admin cho công ty 
-##### Username và Password: 
-###### Tại apps/stdudio/scripts/seed_demo_tenants.py (2 tài khoản cho công ty ankor và borea)
-###### Tạo bằng tài khoản superadmin.  
+`make ingestDB` tạo superadmin từ `STUDIO_SUPERADMIN_EMAIL` và
+`STUDIO_SUPERADMIN_PASSWORD` trong `.env`. Script không có password mặc định và sẽ dừng nếu
+thiếu một trong hai biến.
+
+#### Superadmin
+
+Đăng nhập bằng credential đã đặt trong `.env`. Superadmin chỉ dùng để tạo company mới qua UI.
+Sau đó đăng xuất và đăng nhập bằng tài khoản admin do company vừa tạo.
+
+#### Admin
+
+Admin quản trị company của mình và tạo thêm nhân viên qua tab **Quản trị**. Để thử với tenant demo
+`ankor` hoặc `borea` đã được seed, hãy tạo user bằng `apps/studio/scripts/seed_demo_tenants.py`
+hoặc đăng nhập bằng `admin@ankor.vn` / `admin@borea.vn`. Password lấy từ
+`STUDIO_DEMO_ADMIN_PASSWORD`; nếu không set thì script dùng password dev mặc định
+`doi-mat-khau-nay-truoc-khi-dung-that`. Các credential này chỉ dành cho máy local, không dùng khi
+deploy thật.
 
 ### Dựng recipe trên canvas
 

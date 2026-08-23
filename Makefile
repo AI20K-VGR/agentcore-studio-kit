@@ -7,7 +7,7 @@ endif
 
 setup: ## uv sync the whole workspace (all 6 Python members, 1 venv)
 	uv sync
-	cp .env.example .env
+	test -e .env || cp .env.example .env
 
 dev: ## bring up the default compose profile (pgvector/pgvector:pg17) — wired in P3/P9
 	docker compose up -d
@@ -21,6 +21,9 @@ ingestDB: ## ingest the database
 # mặc định http://127.0.0.1:5173 
 frontend: ## bring up the frontend
 	cd apps/web && corepack enable pnpm && pnpm install && pnpm dev
+
+demo: ## 8-step lifecycle demo harness — wired in P10
+	@echo "demo target — wired in P10 (Frontend + E2E + Docs)"
 
 test: ## run the full pytest suite across the workspace
 	uv run pytest
