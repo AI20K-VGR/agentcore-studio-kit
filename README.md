@@ -171,6 +171,71 @@ pnpm dev   # local dev server
 `package-lock.json` — use `pnpm`, not `npm`: nothing tests the `npm` path, and 2 lockfiles can
 resolve 2 different dependency trees on 2 clean clones.
 
+## Chạy nhanh bằng Docker — 1 lệnh (`scripts/dev-up.ps1` / `scripts/dev-up.sh`)
+
+Cách nhanh nhất để có DB + backend + frontend chạy sẵn kèm tài khoản đăng nhập có sẵn — **chỉ cần
+Docker** trên máy, không cần cài `uv`/Python hay Node/pnpm tay. Phù hợp khi chỉ cần vào được hệ
+thống nhanh (login → canvas trống → chat) — canvas/chat chưa có corpus Callisto thật, xem mục
+"Chạy thử demo Kế hoạch 2" ngay bên dưới nếu cần nội dung KB thật.
+
+### Cần gì trên máy
+- Docker (+ Compose v2 plugin — tức lệnh `docker compose`, KHÔNG phải `docker-compose` v1 có gạch nối)
+- Repo đã clone kèm submodule (`git clone --recurse-submodules ...`, hoặc
+  `git submodule update --init --recursive` nếu lỡ clone thiếu) — cả 2 script đều tự kiểm
+  `apps/studio`/`apps/web` có rỗng không và báo rõ ngay từ đầu nếu thiếu, không để bạn tự dò lỗi
+  `docker build` mù mờ.
+
+### Chạy
+
+**Windows (PowerShell):**
+```powershell
+powershell -File scripts\dev-up.ps1
+```
+
+**Linux (bash):**
+```bash
+./scripts/dev-up.sh
+```
+Cần `bash >= 4` (dùng `mapfile`) — bash mặc định trên macOS là 3.2 (không có `mapfile`, do license
+GPLv3), nên script này **chưa hỗ trợ macOS** trừ khi tự cài `bash` mới hơn qua Homebrew
+(`brew install bash`) và chạy tường minh bằng `bash scripts/dev-up.sh` (không phải `/bin/bash` mặc
+định của hệ thống).
+
+Idempotent — chạy lại nhiều lần cũng an toàn (không tạo trùng tài khoản, không đổi mật khẩu đã
+có, không rebuild lại từ đầu nếu chưa đổi gì). Script tự làm hết:
+
+1. Dựng Postgres (image `pgvector/pgvector:pg17`) nếu chưa chạy, đợi healthcheck.
+2. Áp role (`studio_owner`/`studio_app`/`studio_scorer`) + extension `pgvector`.
+3. Tạo schema `core.*` (tenants/users/…) + seed 3 tài khoản mẫu (bcrypt qua `pgcrypto`, không cần
+   Python để băm mật khẩu).
+4. Tạo `.env` từ `.env.example` nếu chưa có (fake providers bật sẵn — không cần API key thật).
+5. Build + chạy backend (`apps/studio`) và frontend (`apps/web`) qua
+   `docker compose --profile app up -d --build`.
+
+Xong, có ngay:
+
+| | |
+|---|---|
+| Backend | http://127.0.0.1:8000 (docs: `/docs`) |
+| Frontend | http://127.0.0.1:5173 |
+
+| Tài khoản | Mật khẩu | Role | Tenant |
+|---|---|---|---|
+| `superadmin@gmail.com` | `123456789` | `superadmin` | `__system__` |
+| `admin@gmail.com` | `123456789` | `admin` | `default` |
+| `user@gmail.com` | `123456789` | `hr` | `default` |
+
+⚠️ Mật khẩu trên CHỈ dùng cho máy dev cục bộ — không seed kiểu này cho môi trường thật.
+
+Dừng toàn bộ: `docker compose --profile app down` (thêm `-v` nếu muốn xoá luôn volume DB).
+
+**Đã verify:** cả 2 bản chạy sạch từ đầu tới cuối trên Windows (PowerShell + Git Bash thật nói
+chuyện với Docker daemon thật, không phải giả lập) — login qua backend thật cho cả 3 tài khoản
+(200/401 đúng như kỳ vọng), frontend trả HTML thật, `shellcheck` sạch cho bản `.sh`. **Chưa** có
+ai chạy bản `.sh` trên 1 máy Linux gốc thật (chỉ mới verify qua bash + Docker daemon thật trên môi
+trường không phải Linux gốc) — nếu gặp lỗi khi test trên Linux thật, đó là điều đầu tiên cần nghi
+ngờ, không phải giả định "chắc chắn đã chạy được".
+
 ## Chạy thử demo Kế hoạch 2 (login → canvas → Test → Publish → Chat)
 
 `make demo` (target ở trên) hiện chỉ là placeholder — chưa nối harness E2E thật (P10). Muốn tự

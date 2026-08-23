@@ -90,6 +90,31 @@ services:
     # Đường mount khớp đúng default 2 field `Settings` (`/app/state/...`, `/app` là `WORKDIR`).
     volumes:
       - studio_judge_state:/app/state
+    # scripts/dev-up.ps1 (full-stack profile) đợi container này "healthy" trước khi báo xong, và
+    # service `web` bên dưới `depends_on: condition: service_healthy` đúng service này — không có
+    # healthcheck thì cả 2 chỉ biết "container đang chạy", không biết uvicorn đã nhận request
+    # được chưa (backend có thể còn đang chạy `ensure_all_schemas()` ở lifespan). `/openapi.json`
+    # là route công khai mặc định của FastAPI (không qua auth), không cần thêm route riêng.
+    # Dùng `python` có sẵn trong base image (python:3.14-slim) — không cần cài curl/wget.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/openapi.json', timeout=2)"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  web:
+    # Dev-mode Vite server (apps/web/Dockerfile, F4-style multi-stage KHÔNG áp dụng ở đây — build
+    # production tách riêng, ngoài phạm vi profile này) — CHỈ để máy không có Node/pnpm vẫn chạy
+    # được `pnpm dev` qua Docker. Cùng profile `app` (không tách profile riêng): frontend luôn đi
+    # cùng backend trong luồng dev-day-lifecycle, tách profile chỉ thêm 1 cờ phải nhớ gõ thêm.
+    build: ./apps/web
+    profiles: ["app"]
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "5173:5173"
 
   # --- obs profile: Langfuse self-host cluster (R-DI §6 COPY-READY #21 — redis/clickhouse/minio
   # serve Langfuse ONLY; this kit's own queue/store/blob stay Postgres-everything, Decision #2). ---
