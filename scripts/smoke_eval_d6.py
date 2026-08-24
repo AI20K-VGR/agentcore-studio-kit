@@ -59,6 +59,7 @@ from pathlib import Path
 from uuid import UUID
 
 import yaml
+from studio_contracts import Edge, Node
 from studio_contracts.nodes import NodeType
 from studio_engine import run
 from studio_evalhub.agent_runner import AgentAnswer, CaseRun
@@ -66,7 +67,7 @@ from studio_evalhub.golden_case import GoldenCase, GoldenSet
 from studio_evalhub.harness import EvalHarness, SmokeResult, citations_from_trace
 from studio_kb.doc_factory import TENANT_IDS
 from studio_kb.static_search import StaticKbSearch
-from studio_workbench import create_recipe_d6
+from studio_workbench import create_dynamic_recipe
 from studio_workbench.tenant_wall import resolve_session
 
 _ROOT = Path(__file__).resolve().parent.parent
@@ -163,7 +164,10 @@ class EngineAgentRunner:
         section_roles: list[str],
     ) -> CaseRun:
         slug = self._tenant_slugs[tenant_id]
-        recipe = create_recipe_d6(
+        # `create_recipe_d6` bị xoá (workbench#31 follow-up, kit#209) — dựng tường minh qua
+        # `create_dynamic_recipe` cùng hình dạng DAG mà d6 từng sinh (kb-retrieve -> llm-step ->
+        # end, 3 node; d6 chưa bao giờ có node tool-call kể từ workbench#31).
+        recipe = create_dynamic_recipe(
             agent_id=agent_id,
             tenant_id=tenant_id,
             instructions="Bạn là trợ lý nội bộ. Trả lời dựa trên tài liệu được cung cấp.",
@@ -171,7 +175,12 @@ class EngineAgentRunner:
             tool_whitelist=["kb_search"],
             kb_id="kb-callisto-v1",
             scope=f"{slug}/{','.join(section_roles)}",
-            query=query,
+            nodes=[
+                Node(id="n1", type=NodeType.KB_RETRIEVE, params={"query": query, "top_k": 3}),
+                Node(id="n2", type=NodeType.LLM_STEP, params={"temperature": 0.0}),
+                Node(id="n4", type=NodeType.END, params={}),
+            ],
+            edges=[Edge(from_="n1", to="n2"), Edge(from_="n2", to="n4")],
         )
         session_context = resolve_session({"tenant_id": tenant_id, "user": "eval-harness", "roles": section_roles})
         result = await run(
