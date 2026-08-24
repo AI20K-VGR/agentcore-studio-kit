@@ -131,12 +131,88 @@ def test_step_5_fence_proof_zero_leak_money_shot() -> None:
     pytest.skip(reason=E2E_PENDING_REASON)
 
 
-def test_step_6_eval_gate_pass_then_publish() -> None:
+async def test_step_6_eval_gate_pass_then_publish(pool: Any) -> None:
     """Step 6 (AIE-2 eval harness + SWE gate-wiring): running Eval scores the agent against the
     30-case golden set into a scorecard; a PASSing verdict unblocks Publish to a named endpoint.
-    Real assertion (owner fills): scorecard.gate.verdict == PASS for a known-good recipe; the
-    publish endpoint only accepts a recipe whose most recent scorecard verdict is PASS."""
-    pytest.skip(reason=E2E_PENDING_REASON)
+
+    ## Bài này KHÔNG lặp lại bước 7, và đó là lý do nó tồn tại riêng
+
+    Chiều `PASS ⇒ publish thành công` bước 7 đã chạy rồi ("Chiều 1"). Viết lại nó ở đây là thêm một
+    bài xanh mà không thêm một bằng chứng nào. Hai vế dưới đây là thứ bước 7 **không** nói:
+
+    **1. "against the 30-case golden set" — bước 7 không bao giờ đếm.** `success_rate` là một
+    **tỉ lệ**: harness lặng lẽ chấm 3 case thì `3/3 = 1.0` vẫn vượt ngưỡng `0.9`, bước 7 vẫn xanh,
+    và cổng đang gác một mẫu **không ai khai**. Mẫu số phải được khẳng định ở chính chỗ verdict được
+    tin — cùng lý do `Judge.agreement` phải đi kèm mẫu số (`DEC-D16-03`).
+
+    **2. "the publish endpoint only accepts a recipe whose MOST RECENT scorecard verdict is PASS"
+    — trục ĐỘ TƯƠI, không phải trục chất lượng.** Bước 7 luôn ghép mỗi recipe với scorecard của
+    **chính nó**, nên nó không hỏi được câu quan trọng nhất của mệnh đề trên: chuyện gì xảy ra khi
+    ai đó trình một scorecard PASS **cũ** cho một recipe **mới**?
+
+    Đó là đường vòng thật của cổng, và nó rẻ: hạ `instructions`, **giữ nguyên** scorecard PASS của
+    bản tốt, gọi publish. Cổng 4 (`gate.verdict`) **không** chặn được — verdict ấy là `PASS` thật,
+    do một lần chấm thật sinh ra. Thứ duy nhất đứng chắn là cổng 3
+    (`scorecard.recipe_hash != recipe_hash(recipe)`, `DEC-D20-02`).
+
+    Nên assert quyết định ở đây là **thông điệp nói `recipe_hash`, KHÔNG nói `verdict`** — đối xứng
+    với assert phủ định của bước 7 (`"recipe_hash" not in str(bat.value)`). Hai bài cùng chặn, mỗi
+    bài phải chứng minh nó chặn **ở đúng cổng của mình**; thiếu vế đó thì một `publish()` chặn mọi
+    thứ vì một lý do duy nhất vẫn làm cả hai xanh.
+
+    Không đụng ngưỡng (`DEC-D20-03`) và không đụng `instructions` của bản tốt — biến duy nhất giữa
+    hai lần gọi `publish()` là **scorecard nào được trình**.
+    """
+    golden = load_golden_set(_GOLDEN_30, expect_ref=_REF)
+    agent_id = "e2e-step6-stale-scorecard"
+
+    # ── Vế 1: mẫu số của verdict phải là 30, khẳng định tại chỗ verdict được tin ───────────────
+    assert len(golden.cases) == 30, f"bộ golden phải đủ 30 case, có {len(golden.cases)}"
+
+    tot = _recipe(agent_id, _INSTRUCTIONS_TOT)
+    sc_tot = await _cham(tot, golden)
+
+    assert sc_tot.gate.verdict == "PASS", (
+        f"bản tốt phải PASS, nhận {sc_tot.gate.verdict!r} "
+        f"(success={sc_tot.aggregate.success_rate}, citation={sc_tot.aggregate.citation_accuracy})"
+    )
+    assert len(sc_tot.results) == 30, (
+        f"verdict PASS này chấm trên {len(sc_tot.results)} case, không phải 30 — `success_rate` là "
+        "một tỉ lệ, nên một mẫu nhỏ hơn vẫn vượt ngưỡng mà không đo cùng một thứ"
+    )
+    # Scorecard PASS này chứng nhận ĐÚNG recipe vừa chấm — tiền đề của vế 2 bên dưới.
+    assert sc_tot.recipe_hash == recipe_hash(tot)
+
+    async with pool.connection() as conn, conn.transaction():
+        await _bind_tenant(conn, TENANT_IDS["ankor"])
+        await publish(tot, sc_tot, conn)
+    assert await _rows(pool, agent_id) == [(1, "published")]
+
+    # ── Vế 2: scorecard PASS CŨ + recipe MỚI ⇒ chặn ở cổng recipe_hash, không phải cổng verdict ─
+    ha = _recipe(agent_id, _INSTRUCTIONS_HA)
+    assert recipe_hash(ha) != recipe_hash(tot), "hai bản phải khác hash, nếu không vế này vô nghĩa"
+
+    # `pytest.raises` nằm BÊN TRONG transaction — cùng lý do đã ghi ở bước 7: route bắt `ValueError`
+    # rồi ném `HTTPException`, nên connection thoát sạch và psycopg COMMIT. Bọc ra ngoài là đo một
+    # đường không tồn tại trong production.
+    async with pool.connection() as conn, conn.transaction():
+        await _bind_tenant(conn, TENANT_IDS["ankor"])
+        with pytest.raises(ValueError, match="recipe_hash") as bat:
+            await publish(ha, sc_tot, conn)
+
+    # Cổng 4 KHÔNG phải thứ chặn ở đây — verdict được trình vẫn là `PASS` thật. Nếu thông điệp nói
+    # `verdict` thì hoặc cổng 3 đã biến mất, hoặc `publish()` chặn vì một lý do khác thứ bài này đo.
+    assert "verdict" not in str(bat.value), (
+        f"chặn sai cổng: thông điệp nói verdict, nhưng scorecard được trình có "
+        f"verdict={sc_tot.gate.verdict!r} — vế này phải bị cổng recipe_hash chặn"
+    )
+
+    # Bản hạ KHÔNG được ghi, bản tốt v1 vẫn phục vụ — một scorecard PASS cũ không mở được cổng cho
+    # một recipe khác.
+    assert await _rows(pool, agent_id) == [(1, "published")], (
+        "scorecard PASS cũ đã publish được một recipe KHÁC — cổng chỉ đo verdict, không đo scorecard "
+        "này chứng nhận recipe nào"
+    )
 
 
 def _recipe(agent_id: str, instructions: str) -> Recipe:
