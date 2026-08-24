@@ -158,8 +158,21 @@ def _recipe(agent_id: str, instructions: str) -> Recipe:
     )
 
 
-def _trace_event(tenant_id: UUID, citations: list[str], chunks: list[dict[str, object]] | None = None) -> TraceEvent:
-    return TraceEvent(
+def _trace_events(
+    tenant_id: UUID, citations: list[str], chunks: list[dict[str, object]] | None = None
+) -> list[TraceEvent]:
+    """Trace tối thiểu **đúng carrier theo node**: `chunks` ở `kb-retrieve`, `citations` ở `llm-step`.
+
+    Bản đầu dồn cả hai vào **một** event `KB_RETRIEVE` — @DongAnh2704 bắt đúng ở review `kit#208`:
+    theo `agent_loop.py` thật, event `KB_RETRIEVE` **luôn** `citations=None`, chỉ lượt trả-lời-cuối
+    (`LLM_STEP`) mới mang `citations` (cổng C-1). Bài vẫn xanh hôm nay **chỉ vì**
+    `citations_from_trace` cố ý node-agnostic — nên ngày carrier được siết theo node, mọi case ở đây
+    rơi về `citation_accuracy = 0` dù chất lượng không đổi một chút nào, và người đọc sẽ đi tìm
+    regression ở chỗ không có.
+
+    Dựng đúng hai event thay vì để lại một cờ theo dõi: fixture khớp producer thật thì nó không cần
+    ai nhớ tới nó nữa."""
+    kb = TraceEvent(
         event_id="e1",
         run_id="r1",
         agent_id="a1",
@@ -171,8 +184,23 @@ def _trace_event(tenant_id: UUID, citations: list[str], chunks: list[dict[str, o
         outputs={"chunks": chunks if chunks is not None else []},
         tokens=Tokens(prompt=0, completion=0),
         cost=0.0,
+        citations=None,
+    )
+    llm = TraceEvent(
+        event_id="e2",
+        run_id="r1",
+        agent_id="a1",
+        tenant_id=tenant_id,
+        node_id="n_llm",
+        node_type=NodeType.LLM_STEP,
+        ts="2026-08-23T00:00:01.000000",
+        inputs_hash="h",
+        outputs={"answer": "x", "refused": False, "citations": citations},
+        tokens=Tokens(prompt=0, completion=0),
+        cost=0.0,
         citations=citations,
     )
+    return [kb, llm]
 
 
 class _RunnerTheoInstructions:
@@ -208,18 +236,18 @@ class _RunnerTheoInstructions:
             if self._tot:
                 if case.expects_refusal:
                     answer = AgentAnswer(answer="Tôi không thể trả lời câu hỏi này.", citations=[], refused=True)
-                    events = [_trace_event(tenant_id, [chunk_id], chunks=[chunk])]
+                    events = _trace_events(tenant_id, [chunk_id], chunks=[chunk])
                 else:
                     answer = AgentAnswer(
                         answer=f"Theo tài liệu, {case.expected}.",
                         citations=list(case.expected_citation),
                         refused=False,
                     )
-                    events = [_trace_event(tenant_id, list(case.expected_citation))]
+                    events = _trace_events(tenant_id, list(case.expected_citation))
             else:
                 # Bản hạ: không trích nguồn, và KHÔNG từ chối kể cả khi đáng từ chối.
                 answer = AgentAnswer(answer="Bạn nên xem lại tài liệu nội bộ.", citations=[], refused=False)
-                events = [_trace_event(tenant_id, [], chunks=[chunk])]
+                events = _trace_events(tenant_id, [], chunks=[chunk])
             self._fixtures[key] = CaseRun(answer=answer, events=events)
 
     async def run_case(self, *, agent_id: str, query: str, tenant_id: UUID, section_roles: list[str]) -> CaseRun:
@@ -311,9 +339,15 @@ async def test_step_7_regression_blocks_gate_and_rolls_back_money_shot(pool: Any
     # Điểm phải tụt THẬT, không chỉ verdict lật — verdict là hệ quả, số mới là bằng chứng.
     assert sc_ha.aggregate.success_rate < sc_tot.aggregate.success_rate
 
-    with pytest.raises(ValueError, match=r"gate\.verdict='FAIL'") as bat:
-        async with pool.connection() as conn, conn.transaction():
-            await _bind_tenant(conn, TENANT_IDS["ankor"])
+    # `pytest.raises` nằm **BÊN TRONG** transaction, không bọc ngoài — mô phỏng đúng
+    # `routes/publish.py::publish_agent`: route **bắt** `ValueError` rồi ném `HTTPException(409)`,
+    # Starlette biến nó thành Response **trước khi** thoát khỏi `async with pool.connection()` của
+    # `tenant_context_middleware`, nên connection exit **sạch** ⇒ psycopg **COMMIT**. Bọc
+    # `pytest.raises` ra ngoài sẽ để `ValueError` thoát khỏi `transaction()` ⇒ rollback toàn bộ —
+    # một đường **không tồn tại trong production**, và mọi assert sau đó đo nhầm thứ.
+    async with pool.connection() as conn, conn.transaction():
+        await _bind_tenant(conn, TENANT_IDS["ankor"])
+        with pytest.raises(ValueError, match=r"gate\.verdict='FAIL'") as bat:
             await publish(ha, sc_ha, conn)
 
     # Chặn phải VÌ verdict. `publish()` nội suy `agent_id` vào thông điệp nên `match="verdict"` trần
@@ -321,8 +355,34 @@ async def test_step_7_regression_blocks_gate_and_rolls_back_money_shot(pool: Any
     # cổng 2/3 (tiền lệ: `test_gate2_publish_money_shot.py` bài 2, mutant `M-G4`).
     assert "recipe_hash" not in str(bat.value), "chặn sai cổng: thông điệp nói recipe_hash, không phải verdict"
 
-    # Bản tốt VẪN phục vụ, bản hạ KHÔNG bao giờ được ghi ⇒ rollback đã chạy, không phải "chặn rồi bỏ đấy".
-    assert await _rows(pool, agent_id) == [(1, "published")]
+    # Bản tốt v1 VẪN đứng `published`, bản hạ KHÔNG bao giờ được ghi.
+    #
+    # ⚠️ **Khẳng định này CỐ Ý hẹp, và đó là kết quả của review @DongAnh2704 (`kit#208`).** Bản đầu
+    # ghi *"⇒ rollback đã chạy"* — sai, và DE bắt đúng. Đào tiếp thì lý do sâu hơn cả điều DE nêu:
+    #
+    # `_reassert_last_published` là **no-op ở MỌI trạng thái tới được**, nên không assertion nào —
+    # và không cách bố trí transaction nào — phân biệt được "nó chạy" với "nó bị xoá":
+    #
+    #   • chưa có bản nào `published` ⇒ nó `return` sớm (`publish.py`, nhánh `row is None`);
+    #   • có vN `published` ⇒ `rollback(to_version=N)` thấy hàng vN **tồn tại** ⇒ `UPDATE … 'rolled_back'
+    #     WHERE status='published'` rồi `UPDATE … 'published' WHERE id=<vN>` — **hạ rồi nâng lại đúng
+    #     hàng đó**, trạng thái cuối y hệt.
+    #
+    # Nhánh **có** tác dụng (`existing is None` trong `rollback()`, dựng lại hàng từ
+    # `wb.recipe_versions`) không tới được từ `_reassert_last_published`, vì `to_version` luôn là
+    # version của chính hàng vừa tìm thấy đang `published`.
+    #
+    # Đã gieo mutant "xoá hẳn `_reassert_last_published`": **sống sót**, đúng như phân tích. Đó là
+    # tính chất của `publish.py`, không phải lỗ hổng của bài này — nên bài này khẳng định đúng thứ
+    # nó chứng minh được, và finding về code đã báo riêng ở review.
+    #
+    # Vế "rollback" của money-shot vẫn đứng, chỉ khác cơ chế: v1 còn phục vụ **vì nhánh FAIL không
+    # bao giờ hạ nó xuống `draft`** (câu `UPDATE … SET status='draft'` nằm SAU cổng verdict), chứ
+    # không phải vì có ai khôi phục lại.
+    assert await _rows(pool, agent_id) == [(1, "published")], (
+        "bản tốt v1 phải còn `published` và bản hạ không được ghi — endpoint tiếp tục phục vụ bản "
+        "đã biết là tốt sau khi publish bị chặn"
+    )
 
 
 def test_step_8_hitl_pause_resumes_after_approval() -> None:
