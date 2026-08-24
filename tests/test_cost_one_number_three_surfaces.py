@@ -23,21 +23,36 @@ gate trên hằng số 0 sẽ PASS mọi thứ tới ngày nối giá thật r�
 tự quyết mặt 3 là gì — việc đó cần ADR (`docs/decisions/scorecard.md`). Nó khoá hai mặt đang tồn
 tại, và khoá cái điều kiện khiến mặt 3 có nghĩa: **con số phải thật trước đã**.
 
-## Vì sao bài `emit dùng nguồn giá duy nhất` đang `xfail`
+## `xfail` đã gỡ — chuông kêu đúng lúc, và đây là bản ghi của nó
 
-`studio_kb.cost` giữ **bảng đơn giá — nguồn giá DUY NHẤT** và một lưới răng `price_mismatches()`.
-Docstring của lưới đó viết:
+Bài `test_emit_uses_the_single_price_source` sống dưới `xfail(strict=True)` từ `kit#213` tới lần
+bump con trỏ này. Lý do lúc đó: `studio_kb.cost` giữ **bảng đơn giá — nguồn giá DUY NHẤT** cùng lưới
+`price_mismatches()`, và docstring của lưới viết *"Hôm nay mọi `cost=0` **và `tokens=0`** →
+`cost_of=0`, khớp"*. Vế *"và tokens=0"* đã hết đúng từ D19 (`kit#121`) — executor đếm token thật —
+nên lưới **đang kêu trên mọi run thật** mà không ai nghe, vì chưa bài nào gọi nó trên trace thật.
 
-> Hôm nay mọi `cost=0` **và `tokens=0`** → `cost_of=0`, khớp; ngày tokens thành thật mà quên nối
-> giá, hàm này chỉ ra ngay event lệch
+Chọn `xfail(strict=True)` chứ không `skip` là để **CI tự nhắc**: ngày nối giá xong, bài `XPASS ⇒ đỏ`,
+buộc người sửa gỡ cờ thay vì để một bài `skip` im lặng mãi. Nó hoạt động đúng như thế —
+`contracts#11` (dời `cost_of` xuống `contracts`, gỡ chướng ngại `.importlinter`) + `kb#54` +
+`engine#41` (wire `cost=cost_of(tokens)` tại cả 5 điểm emit) merge, con trỏ bump, và bài này đỏ vì
+XPASS. Commit này gỡ cờ.
 
-Vế *"và tokens=0"* **đã hết đúng**: từ D19 (`kit#121`) executor đếm token thật, và `agent_loop.py`
-cũng vậy (`tokens = Tokens(prompt=len(prompt.split()), completion=len(raw.split()))`). Nên lưới đó
-**đang kêu trên mọi run thật** mà không ai nghe — vì không bài test nào gọi nó trên trace thật. Đây
-là bài đó.
+Đo tại thời điểm gỡ, một run 2 lượt qua `run_agent_loop`:
 
-`xfail(strict=True)` chứ không `skip`: ngày AIE-1 nối giá tại điểm emit (§4.1 — áp giá **một lần**,
-tại nơi emit), bài này **XPASS ⇒ đỏ**, buộc người sửa gỡ `xfail` và ghi lại. `skip` thì im lặng mãi.
+```text
+llm-step     tokens=90/6   cost=0.00036
+kb-retrieve  tokens=0/0    cost=0.0        ← 0 token ⇒ 0 cost, "đo được và bằng 0"
+llm-step     tokens=95/4   cost=0.000345
+
+price_mismatches           : []
+studio_kb.aggregate_run_cost      : 0.000705
+studio_evalhub.run_cost_from_trace: 0.000705    ← hai mặt KHỚP, trên số THẬT
+run_cost.priced            : True     ⇒ render.py thôi in "chưa-nối-giá"
+```
+
+Bất biến *"một số, ba mặt"* từ đây đứng trên một số thật thay vì `0 == 0 == (không có)`. Nợ này mở
+từ `DEC-D19-06` (13/08) và đóng ở đây — **11 ngày**, và thứ giữ nó sống suốt quãng đó là một cái
+`xfail` chứ không phải trí nhớ của ai.
 """
 
 from __future__ import annotations
@@ -182,13 +197,6 @@ async def test_the_run_actually_carries_tokens(run_events: list[TraceEvent]) -> 
     assert priced, "không event nào có tokens đủ để ra giá > 0 — cùng lý do trên"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "engine#38 — điểm emit ghi cost=0.0 trong khi tokens đã thật (agent_loop.py:246), nên "
-        "price_mismatches() bắt mọi llm-step. Nối giá tại điểm emit (§4.1) rồi gỡ xfail này."
-    ),
-)
 async def test_emit_uses_the_single_price_source(run_events: list[TraceEvent]) -> None:
     """MẶT 1 phải là số THẬT: mỗi `event.cost` bằng `cost_of(event.tokens)` của chính nó.
 
