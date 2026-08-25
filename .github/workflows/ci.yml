@@ -169,9 +169,15 @@ jobs:
       - run: docker build -t studio-kit:ci .
       # Điểm mù kit#181: job này BUILD image rồi DỪNG — chưa bước nào từng `docker run` nó, nên
       # bất kỳ lỗi chỉ lộ ra ở layout runtime thật (`--no-editable`, không còn `src/`, phẳng hơn
-      # workspace dev 1 cấp) lọt qua toàn bộ CI. Ca cụ thể đã xảy ra: `_GOLDEN_SET_DIR`
-      # (apps/studio/routes/publish.py) đi ngược 3 cấp từ `studio_kb.__file__` — đúng ở editable
-      # install, đi lố khỏi site-packages trong image → `/evaluate` + `/publish` luôn 400.
+      # workspace dev 1 cấp) lọt qua toàn bộ CI. Ca cụ thể đã xảy ra: hằng số thư mục golden-set
+      # đi ngược 3 cấp từ `studio_kb.__file__` — đúng ở editable install, đi lố khỏi site-packages
+      # trong image → `/evaluate` + `/publish` luôn 400.
+      #
+      # app#59 dời hằng số này từ `routes/publish.py::_GOLDEN_SET_DIR` sang
+      # `core/golden_seed.py::GOLDEN_SET_DIR` (route thôi đọc golden-set từ đĩa; giờ chỉ ĐƯỜNG NẠP
+      # cần biết thư mục). Bất biến kit#181 KHÔNG mất theo: `seed_golden_sets` chạy trong đúng
+      # image này, và nó resolve sai thì `eval.golden_sets` rỗng ⇒ `/publish` 400 y như cũ, chỉ
+      # khác chỗ phát sinh. Bước smoke này đổi import theo, không nới assert.
       #
       # Bước này `docker run` CHÍNH image vừa build, gọi `create_app()` thật trong site-packages
       # thật của image (phủ 7 router, không chỉ `publish`), rồi assert thư mục golden-set tồn
@@ -191,8 +197,8 @@ jobs:
         run: |
           docker run --rm -i --entrypoint python studio-kit:ci - <<'PY'
           from studio_app.app import create_app
-          from studio_app.routes.publish import _GOLDEN_SET_DIR
-          assert _GOLDEN_SET_DIR.is_dir(), f'_GOLDEN_SET_DIR không tồn tại trong image: {_GOLDEN_SET_DIR} (kit#181)'
+          from studio_app.core.golden_seed import GOLDEN_SET_DIR
+          assert GOLDEN_SET_DIR.is_dir(), f'GOLDEN_SET_DIR không tồn tại trong image: {GOLDEN_SET_DIR} (kit#181)'
           app = create_app()
-          print(f'OK: _GOLDEN_SET_DIR = {_GOLDEN_SET_DIR}, routes = {len(app.routes)}')
+          print(f'OK: GOLDEN_SET_DIR = {GOLDEN_SET_DIR}, routes = {len(app.routes)}')
           PY
