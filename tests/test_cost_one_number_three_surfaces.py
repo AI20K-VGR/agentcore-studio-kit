@@ -86,7 +86,7 @@ class _Session:
     def __init__(self, tenant_id: UUID) -> None:
         self.tenant_id = tenant_id
         self.user = "cost-seam-test"
-        self.roles = ["public"]
+        self.system_roles = ["public"]
 
 
 class _FixedKbSearch:

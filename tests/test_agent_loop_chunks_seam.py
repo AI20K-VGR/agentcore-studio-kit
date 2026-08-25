@@ -69,10 +69,10 @@ class _Session:
     `_FrozenSessionContext` của engine, dựng lại tại chỗ vì helper test của quadrant khác không phải
     API công khai."""
 
-    def __init__(self, tenant_id: UUID, roles: list[str]) -> None:
+    def __init__(self, tenant_id: UUID, system_roles: list[str]) -> None:
         self.tenant_id = tenant_id
         self.user = "seam-test"
-        self.roles = roles
+        self.system_roles = system_roles
 
 
 class _FixedKbSearch:
