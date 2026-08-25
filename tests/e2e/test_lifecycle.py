@@ -226,7 +226,7 @@ def _recipe(agent_id: str, instructions: str) -> Recipe:
     return Recipe(
         agent_id=agent_id,
         tenant_id=TENANT_IDS["ankor"],
-        agent_config=AgentConfig(instructions=instructions, model="fake", tool_whitelist=[]),
+        agent_config=AgentConfig(system_prompt=instructions, model="fake", tool_whitelist=[]),
         dag=Dag(nodes=nodes, edges=[Edge(from_="n_kb", to="n_llm"), Edge(from_="n_llm", to="n_end")]),
         kb_binding=KbBinding(kb_id="kb-1", scope="ankor/public"),
         golden_set_ref=_REF,
@@ -356,7 +356,7 @@ async def _cham(recipe: Recipe, golden: GoldenSet) -> Any:
         recipe.agent_id,
         _REF,
         golden_set_path=_GOLDEN_30,
-        runner=_RunnerTheoInstructions(golden, TENANT_IDS, recipe.agent_config.instructions),
+        runner=_RunnerTheoInstructions(golden, TENANT_IDS, recipe.agent_config.system_prompt),
         tenant_ids=TENANT_IDS,
         threshold_success=_THRESHOLD_SUCCESS,
         threshold_citation_accuracy=_THRESHOLD_CITATION,
