@@ -134,7 +134,7 @@ def _recipe() -> Recipe:
     return Recipe(
         agent_id="agent-cost-seam",
         tenant_id=_TENANT,
-        agent_config=AgentConfig(instructions="", model="", tool_whitelist=["calculator"]),
+        agent_config=AgentConfig(system_prompt="", model="", tool_whitelist=["calculator"]),
         dag=Dag(nodes=[], edges=[]),
         kb_binding=KbBinding(kb_id="kb-1", scope="ankor/public"),
         golden_set_ref="golden-1",

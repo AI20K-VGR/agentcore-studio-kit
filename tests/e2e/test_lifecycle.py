@@ -226,7 +226,7 @@ def _recipe(agent_id: str, instructions: str) -> Recipe:
     return Recipe(
         agent_id=agent_id,
         tenant_id=TENANT_IDS["ankor"],
-        agent_config=AgentConfig(instructions=instructions, model="fake", tool_whitelist=[]),
+        agent_config=AgentConfig(system_prompt=instructions, model="fake", tool_whitelist=[]),
         dag=Dag(nodes=nodes, edges=[Edge(from_="n_kb", to="n_llm"), Edge(from_="n_llm", to="n_end")]),
         kb_binding=KbBinding(kb_id="kb-1", scope="ankor/public"),
         golden_set_ref=_REF,
