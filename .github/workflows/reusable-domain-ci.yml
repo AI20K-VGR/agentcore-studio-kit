@@ -90,10 +90,38 @@ jobs:
           rm -rf "workspace/${{ inputs.domain_path }}/.git"
 
       - name: uv sync (frozen)
+        id: sync
         working-directory: workspace
         run: uv sync --frozen
 
+      # Bốn cổng tĩnh chạy TRƯỚC pytest và trước cả docker: chúng không cần Postgres, mất vài giây,
+      # và đặt sau bước đắt nhất là ngược thứ tự phản hồi. `!cancelled()` để một cổng đỏ không nuốt
+      # ba cổng còn lại — trước kit#233, pytest đỏ là cả bốn cổng KHÔNG BAO GIỜ chạy, nên nợ lint
+      # tích luỹ vô hình ở mọi PR cross-repo (thứ chắc chắn đỏ test trong lúc chờ bump con trỏ).
+      # `steps.sync.outcome` là điều kiện thật: môi trường dựng hỏng thì cổng nào cũng vô nghĩa.
+      - name: Lint
+        if: ${{ !cancelled() && steps.sync.outcome == 'success' }}
+        working-directory: workspace
+        run: uv run ruff check "${{ inputs.domain_path }}"
+
+      - name: Format check
+        if: ${{ !cancelled() && steps.sync.outcome == 'success' }}
+        working-directory: workspace
+        run: uv run ruff format --check "${{ inputs.domain_path }}"
+
+      - name: Types
+        if: ${{ !cancelled() && steps.sync.outcome == 'success' }}
+        working-directory: workspace
+        run: uv run mypy "${{ inputs.domain_path }}"
+
+      - name: Quadrant fence
+        if: ${{ !cancelled() && steps.sync.outcome == 'success' }}
+        working-directory: workspace
+        run: uv run lint-imports
+
       - name: Start pgvector test DB
+        id: db
+        if: ${{ !cancelled() && steps.sync.outcome == 'success' }}
         working-directory: workspace
         run: |
           docker run -d --name studio-ci-pg \
@@ -105,26 +133,15 @@ jobs:
             docker exec studio-ci-pg pg_isready -U postgres -d studio_test && break
             sleep 2
           done
+          # Vòng lặp trên kết thúc bằng `sleep 2` (thoát 0) kể cả khi pg KHÔNG BAO GIỜ sẵn sàng —
+          # nên phải hỏi lại một lần cuối, nếu không `steps.db.outcome` luôn là 'success' và điều
+          # kiện gác ở bước test dưới trở thành vô nghĩa.
+          docker exec studio-ci-pg pg_isready -U postgres -d studio_test
 
       - name: Run domain tests
+        if: ${{ !cancelled() && steps.db.outcome == 'success' }}
         working-directory: workspace
         run: uv run --package "${{ inputs.domain_package }}" pytest "${{ inputs.domain_path }}/tests" -q
-
-      - name: Lint
-        working-directory: workspace
-        run: uv run ruff check "${{ inputs.domain_path }}"
-
-      - name: Format check
-        working-directory: workspace
-        run: uv run ruff format --check "${{ inputs.domain_path }}"
-
-      - name: Types
-        working-directory: workspace
-        run: uv run mypy "${{ inputs.domain_path }}"
-
-      - name: Quadrant fence
-        working-directory: workspace
-        run: uv run lint-imports
 
       - name: Stop pgvector test DB
         if: always()
