@@ -356,7 +356,7 @@ async def _cham(recipe: Recipe, golden: GoldenSet) -> Any:
         recipe.agent_id,
         _REF,
         golden_set_path=_GOLDEN_30,
-        runner=_RunnerTheoInstructions(golden, TENANT_IDS, recipe.agent_config.instructions),
+        runner=_RunnerTheoInstructions(golden, TENANT_IDS, recipe.agent_config.system_prompt),
         tenant_ids=TENANT_IDS,
         threshold_success=_THRESHOLD_SUCCESS,
         threshold_citation_accuracy=_THRESHOLD_CITATION,
