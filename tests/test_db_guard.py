@@ -98,5 +98,7 @@ def test_this_module_loaded_the_KIT_ROOT_conftest_not_another_one() -> None:
     Xanh-khi-chạy-riêng, đỏ-khi-chạy-chung là loại lỗi tệ nhất để giao đi: CI cũng không thấy, vì
     job `test (root, tests)` chỉ chạy `tests/` nơi không có conftest nào tranh chấp. Nên phải có
     một bài khẳng định **đúng file nào** đã được nạp, thay vì tin vào `sys.path`."""
-    assert Path(_root_conftest.__file__).resolve() == _ROOT_CONFTEST
+    loaded_from = _root_conftest.__file__
+    assert loaded_from is not None, "module nạp bằng importlib phải có __file__"
+    assert Path(loaded_from).resolve() == _ROOT_CONFTEST
     assert _ROOT_CONFTEST.parent.name != "tests", "phải là conftest ở GỐC kit, không phải trong tests/"
