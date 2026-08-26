@@ -122,11 +122,15 @@ class _CollectingTraceWriter:
 
 def _recipe() -> Recipe:
     """`dag` rỗng có chủ đích — `run_agent_loop` là DAG-blind (K8); chỉ `agent_config`/`kb_binding`
-    có ý nghĩa với nó."""
+    có ý nghĩa với nó.
+
+    engine#49 review F2 (dholmes0207, PR #50) — `tool_whitelist` phải khai `kb_search` tường minh từ
+    khi engine đảo A4 (không còn hard-code kb_search luôn khả dụng); thiếu dòng này làm 3 bài dưới
+    đỏ khi con trỏ engine bump lên bản có PR #50 (`ValueError: tool not in whitelist: kb_search`)."""
     return Recipe(
         agent_id="agent-seam-test",
         tenant_id=_TENANT,
-        agent_config=AgentConfig(system_prompt="", model="", tool_whitelist=["calculator"]),
+        agent_config=AgentConfig(system_prompt="", model="", tool_whitelist=["calculator", "kb_search"]),
         dag=Dag(nodes=[], edges=[]),
         kb_binding=KbBinding(kb_id="kb-1", scope="ankor/public"),
         golden_set_ref="golden-1",
