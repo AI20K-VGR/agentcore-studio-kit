@@ -92,13 +92,56 @@ def test_error_message_names_both_halves() -> None:
 
 
 def test_this_module_loaded_the_KIT_ROOT_conftest_not_another_one() -> None:
-    """Chống hồi quy cho đúng lỗi đã xảy ra: bài này từng `from conftest import ...`, và trong một
-    lượt chạy cả workspace thì tên đó bắt nhầm `apps/studio/tests/conftest.py`.
-
-    Xanh-khi-chạy-riêng, đỏ-khi-chạy-chung là loại lỗi tệ nhất để giao đi: CI cũng không thấy, vì
-    job `test (root, tests)` chỉ chạy `tests/` nơi không có conftest nào tranh chấp. Nên phải có
-    một bài khẳng định **đúng file nào** đã được nạp, thay vì tin vào `sys.path`."""
+    """Khẳng định ĐÚNG FILE NÀO đã được nạp, thay vì tin vào `sys.path`."""
     loaded_from = _root_conftest.__file__
     assert loaded_from is not None, "module nạp bằng importlib phải có __file__"
     assert Path(loaded_from).resolve() == _ROOT_CONFTEST
     assert _ROOT_CONFTEST.parent.name != "tests", "phải là conftest ở GỐC kit, không phải trong tests/"
+
+
+def test_loading_still_works_when_a_RIVAL_conftest_shadows_the_name() -> None:
+    """Tái lập **đúng** va chạm đã xảy ra, ngay trong tiến trình này.
+
+    Bài trên một mình chưa đủ: nó xanh cả khi chạy đơn lẻ, nên nó chứng minh "lần này nạp đúng file"
+    chứ không chứng minh "nạp đúng file **kể cả khi** có kẻ tranh chấp tên" (nhận xét review
+    kit#245, TranBaDat2607).
+
+    Ở đây dựng lại đúng điều kiện gây lỗi: đặt `apps/studio/tests` lên ĐẦU `sys.path` và bơm sẵn
+    một module tên `conftest` trỏ vào file của nó — tức trạng thái mà một lượt chạy cả workspace
+    tạo ra. Rồi nạp lại conftest gốc theo cùng cách module này dùng, và đòi vẫn ra đúng file gốc.
+
+    Với `from conftest import ...` cũ, đúng trạng thái này cho `ImportError: cannot import name
+    'TEST_DB_NAME' from 'conftest'`."""
+    rival_dir = _ROOT_CONFTEST.parent / "apps" / "studio" / "tests"
+    rival_conftest = rival_dir / "conftest.py"
+    if not rival_conftest.exists():
+        pytest.skip("không có apps/studio/tests/conftest.py để dựng va chạm")
+
+    saved_path = list(sys.path)
+    saved_module = sys.modules.get("conftest")
+    try:
+        sys.path.insert(0, str(rival_dir))
+        rival_spec = importlib.util.spec_from_file_location("conftest", rival_conftest)
+        assert rival_spec is not None and rival_spec.loader is not None
+        rival = importlib.util.module_from_spec(rival_spec)
+        sys.modules["conftest"] = rival
+        rival_spec.loader.exec_module(rival)
+
+        assert not hasattr(rival, "TEST_DB_NAME"), (
+            "fixture của bài này hỏng: conftest đối thủ phải KHÔNG có TEST_DB_NAME, "
+            "nếu không thì va chạm không tái lập được"
+        )
+
+        spec = importlib.util.spec_from_file_location("kit_root_conftest_probe", _ROOT_CONFTEST)
+        assert spec is not None and spec.loader is not None
+        probe = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(probe)
+
+        assert probe.TEST_DB_NAME == TEST_DB_NAME
+        assert probe.TEST_DB_PORT == TEST_DB_PORT
+    finally:
+        sys.path[:] = saved_path
+        if saved_module is None:
+            sys.modules.pop("conftest", None)
+        else:
+            sys.modules["conftest"] = saved_module
