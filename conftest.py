@@ -52,26 +52,42 @@ def _require_dsn(env_var: str) -> str:
     return value
 
 
-def pytest_configure(config: pytest.Config) -> None:
-    """F11 — fail LOUD (never just skip) when the admin DSN points somewhere that is neither
-    port 5433 NOR database `studio_test`. Backstory (R-DI §9): a wrong DSN here TRUNCATEs a real
-    dev/teammate database, not a disposable one — port-only was not enough, hence + DB-name.
+def guard_admin_dsn(admin_url: str | None) -> None:
+    """F11 — fail LOUD (never just skip) unless the admin DSN is BOTH port 5433 AND database
+    `studio_test`. Backstory (R-DI §9): a wrong DSN here TRUNCATEs a real dev/teammate database,
+    not a disposable one.
+
+    **AND, not OR** — the original condition was `if not (port_ok or dbname_ok)`, which passes any
+    DSN that satisfies EITHER half, while the docstring above it described the AND behaviour. That
+    gap is not theoretical: this repo runs a demo database `studio_demo` on the SAME port 5433 as
+    `studio_test` (a separate database precisely so demo data survives the suite). Under OR, a DSN
+    pointing at `studio_demo` sailed through the guard, and `_truncate_all` then wiped every table
+    in all 5 schemas — which is exactly how a day of demo data was lost once. AND closes it: the
+    port alone no longer vouches for a database.
+
+    Split out of `pytest_configure` so it can be tested directly — the failure this guards against
+    destroys data, so "we believe it works" is not enough.
     """
-    del config
-    admin_url = os.environ.get("STUDIO_DATABASE_URL_ADMIN")
     if not admin_url:
         return  # no DB configured at all — individual fixtures will skip, not fail loud
     parsed = urlsplit(admin_url)
     port_ok = parsed.port == TEST_DB_PORT
     dbname_ok = parsed.path.lstrip("/") == TEST_DB_NAME
-    if not (port_ok or dbname_ok):
+    if not (port_ok and dbname_ok):
         raise pytest.UsageError(
-            f"STUDIO_DATABASE_URL_ADMIN={admin_url!r} is neither port {TEST_DB_PORT} nor "
-            f"database {TEST_DB_NAME!r}. Refusing to run DB tests — this guard exists because a "
-            "wrong DSN here TRUNCATEs a real dev/teammate database, not a disposable test one. "
+            f"STUDIO_DATABASE_URL_ADMIN={admin_url!r} must be BOTH port {TEST_DB_PORT} AND "
+            f"database {TEST_DB_NAME!r} (got port={parsed.port}, db={parsed.path.lstrip('/')!r}). "
+            "Refusing to run DB tests — this guard exists because a wrong DSN here TRUNCATEs a "
+            "real dev/teammate database, not a disposable test one. Note that port 5433 also "
+            "hosts `studio_demo`, whose data the suite would destroy. "
             "Point STUDIO_DATABASE_URL_ADMIN/STUDIO_DATABASE_URL at docker-compose.test.yml's "
             "postgres-test service (port 5433, db studio_test) before running these tests."
         )
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    del config
+    guard_admin_dsn(os.environ.get("STUDIO_DATABASE_URL_ADMIN"))
 
 
 @pytest_asyncio.fixture
