@@ -216,18 +216,24 @@ async def test_step_6_eval_gate_pass_then_publish(pool: Any) -> None:
 
 
 def _recipe(agent_id: str, instructions: str) -> Recipe:
-    """DAG tối thiểu qua đủ 7 luật `graph_lint` (`publish()` gọi nó ở cổng 1). Chỉ `instructions`
-    đổi giữa hai bản — mọi field khác giữ nguyên để `recipe_hash` chỉ lệch **vì** thứ đang đo."""
+    """DAG tối thiểu qua đủ luật hình dạng + hình học mà `publish()` gọi ở cổng 1. Chỉ
+    `instructions` đổi giữa hai bản — mọi field khác giữ nguyên để `recipe_hash` chỉ lệch **vì**
+    thứ đang đo.
+
+    **Không còn node `END`** (app#78 / workbench#48): `graph_lint()` bị tách thành
+    `enforce_agent_shape` + `enforce_agent_topology`, và luật `dag.only_llm_kb_tool_node_types` của
+    hàm thứ hai cấm hẳn mọi type ngoài `llm-step`/`kb-retrieve`/`tool-call`. Giữ `n_end` thì
+    `publish()` ném `ValueError` ngay ở cổng 1 và cả hai bài dưới đây đỏ trước khi chạm tới thứ
+    chúng thật sự đo (verdict của cổng eval, và `recipe_hash` chứng nhận đúng recipe nào)."""
     nodes = [
         Node(id="n_kb", type=NodeType.KB_RETRIEVE, params={"query": "q", "section_roles": ["public"], "top_k": 5}),
         Node(id="n_llm", type=NodeType.LLM_STEP, params={}),
-        Node(id="n_end", type=NodeType.END, params={}),
     ]
     return Recipe(
         agent_id=agent_id,
         tenant_id=TENANT_IDS["ankor"],
         agent_config=AgentConfig(system_prompt=instructions, model="fake", tool_whitelist=[]),
-        dag=Dag(nodes=nodes, edges=[Edge(from_="n_kb", to="n_llm"), Edge(from_="n_llm", to="n_end")]),
+        dag=Dag(nodes=nodes, edges=[Edge(from_="n_kb", to="n_llm")]),
         kb_binding=KbBinding(kb_id="kb-1", scope="ankor/public"),
         golden_set_ref=_REF,
         scorecard_threshold=ScorecardThreshold(success=_THRESHOLD_SUCCESS, citation_accuracy=_THRESHOLD_CITATION),
