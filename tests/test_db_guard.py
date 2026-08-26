@@ -12,8 +12,34 @@ Ca `studio_demo` bên dưới là ca đã xảy ra thật: `studio_demo` chạy 
 
 from __future__ import annotations
 
+import importlib.util
+import sys
+from pathlib import Path
+
 import pytest
-from conftest import TEST_DB_NAME, TEST_DB_PORT, guard_admin_dsn
+
+# Nạp `conftest.py` gốc kit theo ĐƯỜNG DẪN TƯỜNG MINH, không `from conftest import ...`.
+#
+# `tests/` không phải package (không có `__init__.py`), nên pytest chèn chính thư mục chứa file test
+# vào `sys.path` — và trong một lượt chạy cả workspace thì `apps/studio/tests/` cũng được chèn y
+# hệt. Tên module `conftest` khi đó bị tranh chấp, và bên nào vào `sys.modules` trước thì thắng:
+#
+#     ImportError: cannot import name 'TEST_DB_NAME' from 'conftest'
+#       (/…/apps/studio/tests/conftest.py)
+#
+# Bài này XANH khi chạy riêng file và ĐỎ khi chạy cả suite — và CI không thấy, vì job
+# `test (root, tests)` chỉ chạy `tests/`, ở đó không có conftest nào tranh chấp. Nạp theo đường dẫn
+# thì không phụ thuộc `sys.path` nữa, nên không còn phụ thuộc thứ tự thu thập.
+_ROOT_CONFTEST = Path(__file__).resolve().parents[1] / "conftest.py"
+_spec = importlib.util.spec_from_file_location("kit_root_conftest", _ROOT_CONFTEST)
+assert _spec is not None and _spec.loader is not None
+_root_conftest = importlib.util.module_from_spec(_spec)
+sys.modules["kit_root_conftest"] = _root_conftest
+_spec.loader.exec_module(_root_conftest)
+
+TEST_DB_NAME = _root_conftest.TEST_DB_NAME
+TEST_DB_PORT = _root_conftest.TEST_DB_PORT
+guard_admin_dsn = _root_conftest.guard_admin_dsn
 
 _OK = f"postgresql://studio_owner:changeme@127.0.0.1:{TEST_DB_PORT}/{TEST_DB_NAME}"
 
@@ -63,3 +89,14 @@ def test_error_message_names_both_halves() -> None:
     assert str(TEST_DB_PORT) in message
     assert TEST_DB_NAME in message
     assert "5432" in message and "studio_demo" in message
+
+
+def test_this_module_loaded_the_KIT_ROOT_conftest_not_another_one() -> None:
+    """Chống hồi quy cho đúng lỗi đã xảy ra: bài này từng `from conftest import ...`, và trong một
+    lượt chạy cả workspace thì tên đó bắt nhầm `apps/studio/tests/conftest.py`.
+
+    Xanh-khi-chạy-riêng, đỏ-khi-chạy-chung là loại lỗi tệ nhất để giao đi: CI cũng không thấy, vì
+    job `test (root, tests)` chỉ chạy `tests/` nơi không có conftest nào tranh chấp. Nên phải có
+    một bài khẳng định **đúng file nào** đã được nạp, thay vì tin vào `sys.path`."""
+    assert Path(_root_conftest.__file__).resolve() == _ROOT_CONFTEST
+    assert _ROOT_CONFTEST.parent.name != "tests", "phải là conftest ở GỐC kit, không phải trong tests/"
