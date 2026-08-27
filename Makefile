@@ -3,7 +3,7 @@ ifneq (,$(wildcard ./.env))
 	export
 endif
 
-.PHONY: setup dev frontend test test-int leak-test demo lint format
+.PHONY: setup dev frontend test test-int leak-test demo lint format csuper
 
 setup: ## uv sync the whole workspace (all 6 Python members, 1 venv)
 	uv sync
@@ -13,9 +13,7 @@ dev: ## bring up the default compose profile (pgvector/pgvector:pg17) — wired 
 	docker compose up -d
 	uv run uvicorn studio_app.app:create_app --factory --app-dir apps/studio/src --host 127.0.0.1 --port 8000 --reload --no-proxy-headers
 
-ingestDB: ## ingest the database
-	uv run python apps/studio/scripts/seed_demo_tenants.py
-	uv run python packages/kb/scripts/ingest_callisto_v2.py
+csuper: ##Create superadmin only one time 
 	uv run python apps/studio/scripts/seed_superadmin.py
 
 # mặc định http://127.0.0.1:5173 
